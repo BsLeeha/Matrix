@@ -5,13 +5,13 @@ Basic matrix operations written in C++(keep on working now...).
 ## Matrix Arithmetic Operations
 +, -, *, +=, -=, *=
 ## Matrix Basic Operations
-permute
-transpose
-inverse
+permute </br>
+transpose </br>
+inverse </br>
 ## Elimination
-rref
-lower
-upper
+rref </br>
+lower </br>
+upper </br>
 ## Matrix Factorization
-LU factorization
+LU factorization </br>
 
