@@ -55,10 +55,13 @@ namespace Lee{
         bool operator!=(const Matrix &m) const;        
 
         void permute(int r1, int r2);
-        int rank(){ return pivots.size(); }
-        bool is_invertible(){ return (M==N) && (pivots.size() == N); }
+        bool is_invertible(){ return (M==N) && (rank(*this) == N); }
 
         void to_eye();
+        void to_one();
+        void to_zero();
+
+        bool is_diagonal();
 
          T* begin() { return &_data[0]; }
          T* end() { return &_data[0]+M*N; }
@@ -68,6 +71,10 @@ namespace Lee{
 
         int row() const { return M; }
         int col() const { return N; }
+
+        Matrix<T, M, 1> getcol(int);
+        void setcol(int, const Matrix<T, M, 1> &);
+
     private:
         std::array<T, M*N> _data;
 
@@ -205,6 +212,44 @@ namespace Lee{
                 if(i == j)(*this)(i, j) = 1;
                 else (*this)(i, j) = 0;
             }
+    }
+
+    template<typename T, int M, int N>
+    void Matrix<T, M, N>::to_one(){
+        for(int i = 0; i < M; ++i)
+            for(int j = 0; j < N; ++j)
+                (*this)(i, j) = 1;
+    }
+
+    template<typename T, int M, int N>
+    void Matrix<T, M, N>::to_zero(){
+        for(int i = 0; i < M; ++i)
+            for(int j = 0; j < N; ++j)
+                (*this)(i, j) = 0;
+    }
+
+    template<typename T, int M, int N>
+    bool Matrix<T, M, N>::is_diagonal(){
+        if(M != N) return false;
+        int flag = 0;
+        for(int i = 0; i < N; ++i)
+            for(int j = 0; j < N; ++j)
+                if(i!=j && (*this)(i, j)) { flag = 1; break; }
+        return flag ? false : true;
+    }
+
+    template<typename T, int M, int N>
+    Matrix<T, M, 1> Matrix<T, M, N>::getcol(int c){
+        Matrix<T, M, 1> col;
+        for(int i = 0; i < M; ++i)
+            col(i, 0) = (*this)(i, c);
+        return col;
+    }
+
+    template<typename T, int M, int N>
+    void Matrix<T, M, N>::setcol(int c, const Matrix<T, M, 1> &obj){
+        for(int i = 0; i < M; ++i)
+            (*this)(i, c) = obj(i, 0);
     }
 
     template<typename T, int M, int N>

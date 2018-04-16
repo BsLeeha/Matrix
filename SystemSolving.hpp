@@ -49,6 +49,98 @@ namespace Lee{
 
         return x;
     }
+
+    // Jacobi iteration in system form
+    template<typename T, int N>
+    Matrix<T, N, 1> DirectJacobi(Matrix<T, N, N> A, Matrix<T, N, 1> b, Matrix<T, N, 1> x0, T tol){
+        Matrix<T, N, 1> x1 = x0, x2;
+        int k = 0, km = 20;
+
+        while(k++<km && norm2(A*x2-b)>tol){
+            x2.to_zero();
+            for(int i = 0; i < N; ++i){
+                for(int j = 0; j < i; ++j)
+                    x2(i, 0) += A(i, j)*x1(j, 0);
+                for(int j = i+1; j < N; ++j)
+                    x2(i, 0) += A(i, j)*x1(j, 0);
+                x2(i, 0) = -(x2(i, 0)-b(i, 0))/A(i, i);
+            }
+            cout << "x:\n" << x1;             
+            x1 = x2;
+        }
+        if(k >= km) std::cerr << "Iteration Fail!\n";
+        return x2;
+    }
+
+    // Jacobi iteration in matrix form
+    template<typename T, int N>
+    Matrix<T, N, 1> MatrixJacobi(Matrix<T, N, N> A, Matrix<T, N, 1> b, Matrix<T, N, 1> x0, T tol){
+        Matrix<T, N, 1> x1 = x0, x2;
+        int k = 0, km = 20;
+        Matrix<T, N, N> D, L, U;
+
+        for(int i = 0; i < N; ++i)
+                D(i, i) = A(i, i);
+        for(int i = 0; i < N; ++i)
+            for(int j = 0; j < i; ++j)
+                L(i, j) = A(i, j);
+        for(int i = 0; i < N; ++i)
+            for(int j = i+1; j < N; ++j)
+                U(i, j) = A(i, j);
+
+        while(k++<km && norm2(A*x2-b)>tol){
+            std::cout << "x:\n" << x1;
+            x2 = inv(D)*(b-(L+U)*x1);
+            x1 = x2;
+        }
+        if(k >= km) std::cerr << "Iteration Fail!\n";
+        return x2;
+    }
+
+    template<typename T, int N>
+    Matrix<T, N, 1> DirectGaussSeidel(Matrix<T, N, N> A, Matrix<T, N, 1> b, Matrix<T, N, 1>x0, T tol){
+        Matrix<T, N, 1> x1 = x0, x2;
+        int k = 0, km = 20;
+
+        while(k++<km && norm2(A*x2-b)>tol){
+            x2.to_zero();
+            for(int i = 0; i < N; ++i){
+                for(int j = 0; j < i; ++j)
+                    x2(i, 0) += A(i, j)*x2(j, 0);
+                for(int j = i+1; j < N; ++j)
+                    x2(i, 0) += A(i, j)*x1(j, 0);
+                x2(i, 0) = -(x2(i, 0)-b(i, 0))/A(i, i);
+            }
+            std::cout << "x:\n" << x1;
+            x1 = x2;
+        }
+        if(k >= km) std::cerr << "Iteration Fail!\n";
+        return x2;
+    }
+
+    // maybe not exist!!!
+    template<typename T, int N>
+    Matrix<T, N, 1> MatrixGaussSeidel(Matrix<T, N, N> A, Matrix<T, N, 1> b, Matrix<T, N, 1>x0, T tol){
+        Matrix<T, N, 1> x1 = x0, x2;
+        int k = 0, km = 20;
+        Matrix<T, N, N> L, D, U;
+
+        for(int i = 0; i < N; ++i)
+            D(i, i) = A(i, i);
+        for(int i = 0; i < N; ++i)
+            for(int j = 0; j < i; ++j)
+                L(i, j) = A(i, j);
+        for(int i = 0; i < N; ++i)
+            for(int j = i+1; j < N; ++j)
+                U(i, j) = A(i, j);
+
+        while(k++<km && norm2(A*x2-b)>tol){
+            x2 = inv(D)*(b-U*x1-L*x2);
+            x1 = x2;
+        }
+        if(k >= km) std::cerr<<"Iteration Fail\n";
+        return x2;
+    }
 }
 
 #endif

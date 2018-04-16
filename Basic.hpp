@@ -2,8 +2,8 @@
 #define BASIC_H
 
 #include <ctime>
-#include <cmath>
 #include <algorithm>    // for max_element
+#include <cmath>        // for sqrt
 #include "Matrix.hpp"
 
 namespace Lee{
@@ -108,6 +108,11 @@ namespace Lee{
     }
 
     template<typename T, int M, int N>
+    int rank(const Matrix<T, M, N> &m){
+        return pivot(m).size();
+    }
+
+    template<typename T, int M, int N>
     Matrix<T, N, M> transpose(const Matrix<T, M, N> &m){
         Matrix<T, N, M> res;
         for(int i = 0; i != N; ++i)
@@ -172,29 +177,27 @@ namespace Lee{
         return res;
     }
 
-    // template<typename T, int N>
-    // bool is_invertible(const Matrix<T, N, N> &m){
-    //     return det(m);
-    // }
-
-    // template<typename T, int N>
-    // Matrix<T, N, N> inv(const Matrix<T, N, N> &m){
-    //     if(is_invertible(m)) return adj(m)/det(m);
-    //     else { std::cout << "Matrix is not invertible!\n"; return m; }
-    // }
-
     template<typename T, int N>
     Matrix<T, N, N> inv(Matrix<T, N, N> &m){
         Matrix<T, N, N> res;        
 
-        if(m.pivots.empty()) rref(m);
-
         if(m.is_invertible()){
-            Matrix<T, N, 2*N> aug = col_cat<T, N, 2*N>(m, eye<T, N>());
-            aug = rref(aug);
-            res = col_split<T, N, N>(aug, N, 2*N-1);
+            if(m.is_diagonal()){
+                for(int i = 0; i < N; ++i)
+                    res(i, i) = 1/m(i, i);
+            }
+            else{
+                Matrix<T, N, 2*N> aug = col_cat<T, N, 2*N>(m, eye<T, N>());
+                aug = rref(aug);
+                res = col_split<T, N, N>(aug, N, 2*N-1);
+            }
         }
         return res;
+    }
+
+    template<typename T, int N>
+    T norm2(const Matrix<T, N, 1> &m){
+        return sqrt((transpose(m)*m)(0, 0));
     }
 }
 

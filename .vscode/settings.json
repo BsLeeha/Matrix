@@ -49,8 +49,10 @@
         "cofactor",
         "commutativity",
         "eigenvector",
+        "gauss",
         "guassian",
         "keng",
-        "rref"
+        "rref",
+        "seidel"
     ]
 }
