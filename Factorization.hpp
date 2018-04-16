@@ -13,7 +13,7 @@ namespace Lee{
         Matrix<T, N, N> U = m;
         Matrix<T, N, N> E, tmp;
         Matrix<T, N, N> P;
-        E.to_eye(); tmp.to_eye(); P.to_eye();
+        E.to_eye(); tmp.to_eye(); P.to_eye(); L.to_eye();
         std::tuple<Matrix<T, N, N>, Matrix<T, N, N>> res;
 
         int flag = 0;
@@ -49,7 +49,9 @@ namespace Lee{
                     break;                              // find pivot in the next line
                 }
             }
-        L = inv(E);
+        for(int i = 0; i < N; ++i)
+            for(int j = 0; j < N; ++j)
+                if(i>j) L(i, j) = -E(i, j);
         std::get<0>(res) = L;
         std::get<1>(res) = U;
         return res;

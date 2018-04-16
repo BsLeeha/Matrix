@@ -3,6 +3,7 @@
 
 #include <ctime>
 #include <cmath>
+#include <algorithm>    // for max_element
 #include "Matrix.hpp"
 
 namespace Lee{
@@ -64,6 +65,20 @@ namespace Lee{
         for(int i = 0; i < M; ++i)
             for(int j = ci; j <= cj; ++j)
                 res(i, j-ci) = m(i, j);
+        return res;
+    }
+
+    template<typename T, int M, int N>
+    T max(const Matrix<T, M, N> &m){
+        return *std::max_element(m.cbegin(), m.cend());
+    }
+
+    template<typename T, int M, int N>
+    Matrix<T, M, N> abs(const Matrix<T, M, N> &m){
+        Matrix<T, M, N> res = m;
+        for(int i = 0; i < M; ++i)
+            for(int j = 0; j < N; ++j)
+                res(i, j) = ((m(i, j) > 0) ? m(i, j) : -m(i, j));
         return res;
     }
 

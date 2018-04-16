@@ -63,6 +63,9 @@ namespace Lee{
          T* begin() { return &_data[0]; }
          T* end() { return &_data[0]+M*N; }
 
+         const T* cbegin() const { return &_data[0]; }
+         const T* cend() const {return &_data[0]+M*N; }
+
         int row() const { return M; }
         int col() const { return N; }
     private:

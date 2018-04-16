@@ -38,13 +38,17 @@
         "xstddef": "cpp",
         "xstring": "cpp",
         "xtr1common": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "set": "cpp",
+        "xtree": "cpp"
     },
     "cSpell.words": [
+        "cbegin",
         "cntc",
         "cntr",
         "cofactor",
         "commutativity",
+        "eigenvector",
         "guassian",
         "keng",
         "rref"
