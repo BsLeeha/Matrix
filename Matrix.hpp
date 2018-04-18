@@ -72,8 +72,8 @@ namespace Lee{
         int row() const { return M; }
         int col() const { return N; }
 
-        Matrix<T, M, 1> getcol(int);
-        void setcol(int, const Matrix<T, M, 1> &);
+        Matrix<T, M, 1> getcol(int c);
+        void setcol(int c, const Matrix<T, M, 1> &);
 
     private:
         std::array<T, M*N> _data;
@@ -246,10 +246,28 @@ namespace Lee{
         return col;
     }
 
+    template<typename T, int M, int N, int M1>
+    Matrix<T, M1, 1> getcol(Matrix<T, M, N> m, int c, int rs, int re){
+        Matrix<T, M1, 1> col;
+        if(M1-1 == re-rs) {
+            for(int i = rs; i <= re; ++i)
+                col(i-rs, 0) = m(i, c);
+        }
+        return col;
+    }
+
     template<typename T, int M, int N>
     void Matrix<T, M, N>::setcol(int c, const Matrix<T, M, 1> &obj){
         for(int i = 0; i < M; ++i)
             (*this)(i, c) = obj(i, 0);
+    }
+
+    template<typename T, int M, int N, int M1>
+    void setcol(Matrix<T, M, N> &m, int c, const Matrix<T, M1, 1> &obj, int rs, int re){
+        if(M1-1 == re-rs){
+            for(int i = rs; i <= re; ++i)
+                m(i, c) = obj(i-rs, 0);
+        }
     }
 
     template<typename T, int M, int N>

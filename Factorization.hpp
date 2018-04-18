@@ -53,7 +53,7 @@ namespace Lee{
     }
 
     template<typename T, int M, int N>
-    std::tuple<Matrix<T, M, N>, Matrix<T, N, N>> QR(Matrix<T, M, N> A){
+    std::tuple<Matrix<T, M, N>, Matrix<T, N, N>> QRGramScmidt(Matrix<T, M, N> A){
         Matrix<T, M, N> Q;
         Matrix<T, N, N> R;
         std::tuple<Matrix<T, M, N>, Matrix<T, N, N>> res; 
@@ -78,7 +78,7 @@ namespace Lee{
     }
 
     template<typename T, int M, int N>
-    std::tuple<Matrix<T, M, M>, Matrix<T, M, N>> QRx(Matrix<T, M, N> A){
+    std::tuple<Matrix<T, M, M>, Matrix<T, M, N>> QRGramScmidtex(Matrix<T, M, N> A){
         Matrix<T, M, M> Q;
         Matrix<T, M, N> R;
         std::tuple<Matrix<T, M, M>, Matrix<T, M, N>> res; 

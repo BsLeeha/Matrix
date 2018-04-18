@@ -16,10 +16,11 @@ try{
     Lee::Matrix<double, 3, 3> e{3, 1, -1, 2, 4, 1, -1, 2, 5};
     Lee::Matrix<double, 3, 4> e1{1, 2, 2, 2, 2, 4, 6, 8, 3, 6, 8, 10};
     Lee::Matrix<double, 3, 1> b{4, 1, 1};
-    Lee::Matrix<double, 3, 2> A = {1, -4, 2, 3, 2, 2};
+    Lee::Matrix<double, 3, 3> A = e;
     Lee::Matrix<double, 2, 1> x = {0, 1};
-    vector<double> pivots = pivot(A);
-    cout << A << "\n" << get<0>(QRx(A)) << "\n" << get<1>(QRx(A)) << "\n" << get<0>(QRx(A))*get<1>(QRx(A));
+    tuple<double, Lee::Matrix<double, 3, 1>> res = inverse_power_method(A, Lee::Matrix<double, 3, 1>{1, 1, 1}, 1);
+    cout << get<0>(res) << "\n" << get<1>(res) << "\n" << A*get<1>(res) << "\n" << get<0>(res)*get<1>(res);
+    // cout << A << "\n" << get<0>(QRex(A)) << "\n" << get<1>(QRex(A)) << "\n" << get<0>(QRex(A))*get<1>(QRex(A));
     // cout << DJI(A, b, Lee::Matrix<double, 2, 1>{1, 1}, 0.0005);
     // set<Term, TermComparator> s1 = {{1, 3}, {1, 1}, {-1, 0}};
     // Poly p1{s1};
