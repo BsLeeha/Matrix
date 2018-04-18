@@ -269,25 +269,6 @@ namespace Lee{
                 m(i, c) = obj(i-rs, 0);
         }
     }
-
-    template<typename T, int M, int N>
-    Matrix<T, N, 1> least_square(const Matrix<T, M, N> &A, const Matrix<T, M, 1> &b){
-        Lee::Matrix<double, N, N> S = transpose(A)*A;
-        Lee::Matrix<double, N, 1> x = inv(S)*transpose(A)*b;
-        Lee::Matrix<double, M, 1> p = A*x;
-        Lee::Matrix<double, M, 1> e = b-p;
-        Lee::Matrix<double, M, M> P = A*inv(S)*transpose(A);
-
-        // cout << "A and b \n";
-        // cout << A << "\n";
-        // cout << b << "\n";
-        // cout << "solution to x: \n" << x << "\n";
-        // cout << "the error: \n" << e << "\n";
-        // cout << "the projection matrix:\n" << P << "\n";
-        // cout << "the transpose matrix:\n" << transpose(P) << "\n";
-        // cout << std::boolalpha << (P == transpose(P)) << (P*P == P) << (P(0, 0) == transpose(P)(0, 0));
-        return x;
-    }
 }
 
 #endif

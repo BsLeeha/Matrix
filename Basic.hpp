@@ -16,13 +16,15 @@ namespace Lee{
         return m;
     }
 
-    template<typename T, int N>
-    Matrix<T, N, N>& power(Matrix<T, N, N> &m, int k){
-        while(--k){
-            m = m*m;
-        }
-        return m;
-    }
+    template<typename T, int M, int N>
+    Matrix<T, M, N> rand(){
+        Matrix<T, M, N> tmp;
+        std::srand(time(nullptr));
+        for(int i = 0; i != M; ++i)
+            for(int j = 0; j != N; ++j)
+                tmp(i, j) = std::rand()%20+1;
+        return tmp;
+    }    
 
     template<typename T, int M, int N, int M1, int M2>
     Matrix<T, M, N> row_cat(const Matrix<T, M1, N> &m1, const Matrix<T, M2, N> &m2){
@@ -82,29 +84,20 @@ namespace Lee{
         return res;
     }
 
+    template<typename T, int N>
+    Matrix<T, N, N>& power(Matrix<T, N, N> &m, int k){
+        while(--k){
+            m = m*m;
+        }
+        return m;
+    }
+
     template<typename T, int M, int N>
     void Matrix<T, M, N>::permute(int r1, int r2){
         if(r1 >= M || r2 >= M) throw std::out_of_range("Matrix index");
         for(int j = 0; j != N; ++j){
             std::swap((*this)(r1, j), (*this)(r2, j));
         }
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N> rand(){
-        Matrix<T, M, N> tmp;
-        std::srand(time(nullptr));
-        for(int i = 0; i != M; ++i)
-            for(int j = 0; j != N; ++j)
-                tmp(i, j) = std::rand()%20+1;
-        return tmp;
-    }
-
-    template<typename T, int M1, int N1, int M2, int N2>
-    bool is_commute(Matrix<T, M1, N1> &m1, Matrix<T, M2, N2> &m2){
-        if(M1 != N2 || M2 != N1) return false;
-        if(m1*m2==m2*m1) return true;
-        else return false;
     }
 
     template<typename T, int M, int N>
@@ -119,6 +112,13 @@ namespace Lee{
             for(int j = 0; j != M; ++j)
                 res(i, j) = m(j, i);
         return res;
+    }    
+
+    template<typename T, int M1, int N1, int M2, int N2>
+    bool is_commute(Matrix<T, M1, N1> &m1, Matrix<T, M2, N2> &m2){
+        if(M1 != N2 || M2 != N1) return false;
+        if(m1*m2==m2*m1) return true;
+        else return false;
     }
 
     template<typename T, int M, int N>
@@ -193,6 +193,25 @@ namespace Lee{
             }
         }
         return res;
+    }
+
+    template<typename T, int M, int N>
+    Matrix<T, N, 1> least_square(const Matrix<T, M, N> &A, const Matrix<T, M, 1> &b){
+        Lee::Matrix<double, N, N> S = transpose(A)*A;
+        Lee::Matrix<double, N, 1> x = inv(S)*transpose(A)*b;
+        Lee::Matrix<double, M, 1> p = A*x;
+        Lee::Matrix<double, M, 1> e = b-p;
+        Lee::Matrix<double, M, M> P = A*inv(S)*transpose(A);
+
+        // cout << "A and b \n";
+        // cout << A << "\n";
+        // cout << b << "\n";
+        // cout << "solution to x: \n" << x << "\n";
+        // cout << "the error: \n" << e << "\n";
+        // cout << "the projection matrix:\n" << P << "\n";
+        // cout << "the transpose matrix:\n" << transpose(P) << "\n";
+        // cout << std::boolalpha << (P == transpose(P)) << (P*P == P) << (P(0, 0) == transpose(P)(0, 0));
+        return x;
     }
 
     template<typename T, int N>
