@@ -36,6 +36,4 @@ Matrix 类的定义及四则运算等实用函数
 **SystemSolving**: </br>
 方程组求解：直接法(两种高斯消元)，迭代法(Jacobi 迭代，GaussSeidel 迭代);
 
-**Basic.hpp**: </br>
-
 
