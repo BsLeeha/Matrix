@@ -10,13 +10,12 @@ CFLAGS = -g -Wall -fexceptions -std=c++11
 default : entry
 
 # create executable file lee: these object files needed
-entry: main.o
+entry: main.o 
 	$(CC) $(CFLAGS) -o lee main.o 
 
 # main.o generate
 main.o: main.cpp 
-	$(CC) $(CFLAGS) -c main.cpp
-
+	$(CC) $(CFLAGS) -c main.cpp 
 
 # make clean
 # exe: executable file

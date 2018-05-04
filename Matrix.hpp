@@ -6,269 +6,299 @@
 #include <array>
 #include <cstdlib>
 #include <tuple>
-
-// since array provides move constructor and move assignment, we don't need to provide anymore.
-// std array doesn't provide any arithmetical operation
-// std array do nothing to the default constructor
-// We don't need to provide size match test for =, +=, -= for MdArray &a says a is of M*N
-// Difficult error to detect: const to non-const
-// when writing a reference parameter, think of the rvalue
-// ^ is used for bit-wise operation, don't overload it, use power
-// we can assign rvalue to *this: (transpose(A+B)==(transpose(A)+transpose(B)))
-// nested loop: use < not !=
-
-/**
- * Basic matrix operations: sum, scalar multiple, matrix multiple, commutativity judge(A*B==B*A), transpose, left(i, j)
- * For square matrices: power, determinant, cofactor, adjoint, inverse
-**/
-
-// needs to do: special class: vector(N*1), Identity matrix(N*N)
+#include <algorithm>
+#include <type_traits>
+#include <cassert>
+#include "Matrix_Impl.hpp"
+#include "Matrix_Slice.hpp"
+#include "Matrix_ref.hpp"
 
 namespace Lee{
-    using std::cin;
-    using std::cout;
-    
-    template<typename T, int M, int N>
-    class Matrix{
+
+    template<typename T, size_t N>
+    class Matrix_base{
     public:
-        // typedef std::pair<int, int> _pos;
-        // typedef std::pair<T, _pos> piv;
-        // std::vector<piv> pivots;
-
-        typedef std::tuple<int, int, int> piv;
-        std::vector<piv> pivots;
-
-        Matrix(){for(auto &i : _data) i = 0;}
-        Matrix(std::initializer_list<T> il);
-        Matrix(const Matrix &m);              // copy constructor
-//        Matrix(Matrix &&m);                 // move constructor
-        ~Matrix(){ _data.~array(); }
-
-        T operator()(int i, int j) const { return _data[i*N+j]; }   // data visit: must be const
-        T& operator()(int i, int j) { return _data[i*N+j]; }        // for operator >> to write
-        Matrix& operator=(const Matrix &m);   // copy assignment
-//        Matrix& operator=(Matrix &&m);      // move constructor
-        Matrix& operator+=(const Matrix &m);
-        Matrix& operator-=(const Matrix &m);
-        Matrix& operator*=(double r);
-        bool operator==(const Matrix &m) const;
-        bool operator!=(const Matrix &m) const;        
-
-        void permute(int r1, int r2);
-        bool is_invertible(){ return (M==N) && (rank(*this) == N); }
-
-        void to_eye();
-        void to_one();
-        void to_zero();
-
-        bool is_diagonal();
-
-         T* begin() { return &_data[0]; }
-         T* end() { return &_data[0]+M*N; }
-
-         const T* cbegin() const { return &_data[0]; }
-         const T* cend() const {return &_data[0]+M*N; }
-
-        int row() const { return M; }
-        int col() const { return N; }
-
-        Matrix<T, M, 1> getcol(int c);
-        void setcol(int c, const Matrix<T, M, 1> &);
-
     private:
-        std::array<T, M*N> _data;
-
+    
     };
 
-    template<typename T, int M, int N>
-    std::ostream& operator<<(std::ostream &os, const Matrix<T, M, N> &m){
-        for(int i = 0; i < M; ++i){
-            for(int j = 0; j < N; ++j){
-                os.width(8);
-                os.precision(3);
-                os << std::fixed << m(i, j) << " ";
-            }
-            os << "\n";
+    template<typename T, size_t N>
+    using Matrix_initializer = MatrixImpl::NestedInitializerListN<T, N>;
+
+    template<typename T, size_t N>      // N dimension
+    class Matrix{
+    template<typename U>
+    friend std::ostream& operator<<(std::ostream &os,  Matrix<U, 1> m);
+    template<typename U, size_t M>
+    friend std::ostream& operator<<(std::ostream &os, Matrix<U, M> m);
+
+    public:
+        // Conventional aliases
+        using value_type = T;
+        using iterator = typename std::vector<T>::iterator;
+        using const_iterator = typename std::vector<T>::const_iterator;
+        using reverse_iterator = typename std::vector<T>::reverse_iterator;
+        using const_reverse_iterator = typename std::vector<T>::const_reverse_iterator;
+
+        // Initialization
+        Matrix() = default;                                         // default
+        Matrix(const Matrix &) = default;                           // copy
+        Matrix& operator=(const Matrix&) = default;     
+        Matrix(Matrix &&) = default;                                // move
+        Matrix& operator=(Matrix&&) = default;
+        ~Matrix() = default;
+
+        template<typename...Ts>                                     // (), initialize dims from extents
+        Matrix(Ts...ts)
+            : desc{0, ts...}, elems(MatrixImpl::product(ts...)){}
+
+        Matrix(Matrix_initializer<T, N> list){                      // {}, initialize elems from nested initializer_list
+            desc.start = 0;
+            MatrixImpl::derive_extents<N>(list, desc.extents.data());
+            desc.strides_init();
+            elems.reserve(desc.size);
+            MatrixImpl::derive_elems<T, N>(list, elems);
+
+            assert(desc.size == elems.size() && "extents size and elems size not match");
         }
+        Matrix& operator=(Matrix_initializer<T, N>);
+
+        // template<typename U, typename std::enable_if<(N>1), void>::type* = nullptr>
+        // Matrix(std::initializer_list<U>) = delete;                  // disable {} initialization with extents
+
+        // template<typename U>
+        // Matrix& operator=(std::initializer_list<U>) = delete;
+
+        // basic info
+        static constexpr size_t order() { return N; }
+        size_t size() const { return desc.size; }
+        size_t extent(size_t i) const { return desc.extents[i]; }
+
+        size_t rows() const { return extent(0); }
+        size_t cols() const { return extent(1); }
+
+        const Matrix_slice<N>& descript() const { return desc; }
+
+        std::vector<T>* elem() { return &elems; }
+        T*       data() { return elems.data(); }
+        const T* data() const { return elems.data(); }    
+
+        iterator begin() { return elems.begin(); }
+        const_iterator begin() const { return elems.begin(); }
+        const_iterator cbegin() const {return elems.cbegin(); }
+        
+        iterator end() { return elems.end(); }
+        const_iterator end() const { return elems.end(); }        
+        const_iterator cend() const { return elems.cend(); }            
+
+
+        // fortan style elem access
+        template<typename...Dims>
+        T& operator()(Dims...dims){
+            assert(MatrixImpl::Request_index(dims...) && "index type wrong");
+
+            return elems[desc(dims...)];
+        }
+
+        template<typename...Dims>
+        const T& operator()(Dims...dims) const{
+            assert(MatrixImpl::Request_index(dims...) && "index type wrong");
+            
+            return elems[desc(dims...)];
+        }
+
+        // row/col access
+        Matrix_ref<T, N-1>       operator[](size_t i) { return row(i); }
+        Matrix_ref<const T, N-1> operator[](size_t i) const { return row(i); }
+
+        Matrix_ref<T, N-1>       row(size_t i){
+            static_assert(N-1>0, "1 dim matrix has no row to choose");
+            assert(i < rows() && "row index over bound");
+
+            Matrix_slice<N-1> slice;
+            slice.start = desc.start + i*desc.strides[0];
+            std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
+            slice.strides_init();
+
+            Matrix_ref<T, N-1> res{slice, &elems};
+            return res;
+        }
+
+         Matrix_ref<const T, N-1> row(size_t i) const{
+            static_assert(N-1>0, "1 dim matrix has no row to choose");            
+            assert(i < rows() && "row index over bound");
+
+            Matrix_slice<N-1> slice;
+            slice.start = desc.start + i*desc.strides[0];
+            std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
+            slice.strides_init();
+
+            Matrix_ref<T, N-1> res{slice, &elems};
+            return res;        
+        }
+
+        Matrix_ref<T, N-1>       col(size_t i){
+            static_assert(N-1>0, "1 dim matrix has no col to choose");            
+            assert(i < cols() && "col index over bound");
+       
+            Matrix_slice<N-1> coldesc;
+            coldesc.start = desc.start + i*desc.strides[1];
+            std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
+            if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
+            coldesc.size = desc.size/desc.extents[1];
+            std::copy(desc.strides.begin(), desc.strides.begin()+1, coldesc.strides.begin());
+            if(N != 2) std::copy(desc.strides.begin()+2, desc.strides.end(), coldesc.strides.begin()+1);            
+
+            Matrix_ref<T, N-1> res{coldesc, &elems};
+            return res;             
+        }
+
+        Matrix_ref<const T, N-1> col(size_t i) const{
+            static_assert(N-1>0, "1 dim matrix has no col to choose");            
+            assert(i < cols() && "col index over bound");
+       
+            Matrix_slice<N-1> coldesc;
+            coldesc.start = desc.start + i*desc.strides[1];
+            std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
+            if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
+            coldesc.size = desc.size/desc.extents[1];
+            std::copy(desc.strides.begin(), desc.strides.begin()+1, coldesc.strides.begin());
+            if(N != 2) std::copy(desc.strides.begin()+2, desc.strides.end(), coldesc.strides.begin()+1);            
+
+            Matrix_ref<T, N-1> res{coldesc, &elems};
+            return res;             
+        }
+
+        // matrix add
+        Matrix<T, N>& operator+=(const Matrix<T, N> &m){
+            assert(rows() == m.rows() && cols() == m.cols() && "cannot add");
+
+            std::transform(begin(), end(), m.begin(), elems.begin(), std::plus<T>());
+            return *this;
+        }
+
+        // matrix substract
+        Matrix<T, N>& operator-=(const Matrix<T, N> &m){
+            assert(rows() == m.rows() && cols() == m.cols() && "cannot subtract");
+
+            std::transform(begin(), end(), m.begin(), elems.begin(), std::minus<T>());
+            return *this;
+        }
+
+        // scalar multiplication
+        Matrix<T, N>& operator*=(T m){
+            std::for_each(begin(), end(), [m](T &item){ item *= m;});
+            return *this;
+        }
+
+        // matrix multiplication
+        Matrix<T, 2> operator*=(const Matrix<T, 2> &m){
+            assert(cols() == m.rows() && "cannot multiply");
+
+            Matrix<T, 2> res(rows(), m.cols());
+            for(size_t i = 0; i < rows(); ++i)
+                for(size_t j = 0; j < m.cols(); ++j)
+                    for(size_t k = 0; k < cols(); ++k){
+                        res(i, j) += (*this)(i, k) * m(k, j);
+                    }
+            return res;
+        }
+
+
+    private:
+        Lee::Matrix_slice<N> desc;                // slice descripting extents of each dimension    
+        std::vector<T> elems;                     // elements
+    };
+
+    // overload ouput
+    template<typename T>
+    std::ostream& operator<<(std::ostream &os,  Matrix<T, 1> m){
+        os << m.desc;        
+        os << '{';
+        for(size_t i = 0; i < m.size(); ++i){
+            os << m(i);
+            if(i+1 != m.size()) os << ", ";
+        }
+        os << "}\n";
+        return os;
+    }  
+
+    template<typename T, size_t N>
+    std::ostream& operator<<(std::ostream &os,  Matrix<T, N> m){
+        os << m.desc;
+        for(size_t i = 0; i < m.rows(); ++i){
+            os << m[i] << '\n';
+        }
+        return os;
+    }       
+
+    /* Scalar Class Specialization */
+    template<typename T>
+    class Matrix<T, 0>{
+    public:
+        using value_type = T;
+
+        // initialize
+        Matrix() = default;
+        Matrix(const Matrix<T, 0>&) = default;
+        Matrix& operator=(const Matrix<T, 0> &) = default;
+        Matrix(const T &x) : elem{x} {}
+        Matrix& operator=(const T &x) { elem = x; return *this; }
+
+        // elem access
+        T& operator()() { return elem; }
+        const T& operator()() const { return elem; }
+
+    private:
+        T elem;  
+    };
+
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Matrix<T, 0> &m){
+        os << m();
         return os;
     }
 
-    template<typename T, int M, int N>
-    std::istream& operator>>(std::istream &is, Matrix<T, M, N> &m){
-        char c;
-        if(cin>>c && c=='['){            // start with a '['
-            for(int i = 0; i < M; ++i){
-                for(int j = 0; j < N; ++j){
-                    is >> m(i, j);
-                }
-                if(i!=M-1 && (is.get()!= ';')) { std::cout <<"\nmissing delimeter ';'\n"; return is; }
-            }
-            if(is.get()!=']') std::cout << "\nmissing ']', but that's ok!\n";
-            return is;
-        }
-        else std::cout << "\nshould start with '['\n";
-        return is;
+    /* Random Class for test */
+    template<typename T, size_t N>
+    class RandomMatrix : public Matrix<T, N>{
+    public:
+        RandomMatrix(size_t m, size_t n)
+        : Matrix<T, N>(m, n){
+            srand(time(NULL));
+            for(auto &i : *Matrix<T, N>::elem()) i = rand()%100;
+        }     
+    };
+
+    /* Convenient Alias */
+    template<typename T>
+    using Real_Scalar = Matrix<double, 0>;
+
+    template<typename T>
+    using Real_Vector = Matrix<double, 1>;
+
+    template<typename T>
+    using Real_Matrix = Matrix<double, 2>;
+
+
+    // Matrix add
+    template<typename T, size_t N>
+    Matrix<T, N> operator+(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
+        return lhs += rhs;
     }
 
-    template<typename T, int M, int N>
-    Matrix<T, M, N>::Matrix(const Matrix &m)     // copy constructor
-        : _data{m._data}
-    {}
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N>::Matrix(std::initializer_list<T> il){
-        std::copy(il.begin(), il.end(), _data.begin());
+    // Matrix subtract
+    template<typename T, size_t N>
+    Matrix<T, N> operator-(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
+        return lhs -= rhs;
     }
 
-    template<typename T, int M, int N>
-    Matrix<T, M, N>& Matrix<T, M, N>::operator=(const Matrix& m){    // copy assignment
-//        if(row()!=m.row() || col()!=m.col())
-//            throw std::runtime_error("array size mismatch for operator =");
-        _data = m._data;
-        return *this;
-    }
+    // Matrix multiplication
+    template<typename T, size_t N>
+    Matrix<T, N> operator*(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
+        return lhs *= rhs;
+    }    
 
-    template<typename T, int M, int N>
-    bool Matrix<T, M, N>::operator==(const Matrix &m) const{
-        for(int i = 0; i != M; ++i)
-            for(int j = 0; j != N; ++j)
-                if(m(i, j) != (*this)(i, j)) { cout << "i: " << i <<  " j: " << j << " "<< (m(i, j) == (*this)(i, j)) << "\n";return false;}
-        return true;
-    }
+}   // Lee
 
-    template<typename T, int M, int N>
-    bool Matrix<T, M, N>::operator!=(const Matrix &m) const{
-        return !(*this == m);
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N>& Matrix<T, M, N>::operator+=(const Matrix &m){
-//        if(row()!=m.row() || col()!=m.col())
-//            throw std::runtime_error("array size mismatch for operator +=");
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j)
-                (*this)(i, j) += m(i, j);
-        return *this;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N>& Matrix<T, M, N>::operator-=(const Matrix &m){
-//        if(row()!=m.row() || col()!=m.col())
-//            throw std::runtime_error("array size mismatch for operator -=");
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j)
-                (*this)(i, j) -= m(i, j);
-        return *this;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N>& Matrix<T, M, N>::operator*=(double r){
-        for(int i = 0; i != M; ++i)
-            for(int j = 0; j != N; ++j)
-                (*this)(i, j) *= r;
-        return *this;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N> operator+(Matrix<T, M, N> m1, Matrix<T, M, N> m2){
-        return m1 += m2;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N> operator-(Matrix<T, M, N> m1, Matrix<T, M, N> m2){
-        return m1 -= m2;
-    }
-
-   template<typename T, int M, int N>
-    Matrix<T, M, N> operator*(double r, Matrix<T, M, N> m){
-        return m *= r;
-    }
-
-   template<typename T, int M, int N>
-    Matrix<T, M, N> operator*(Matrix<T, M, N> m, double r){
-        return m *= r;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, N> operator/(Matrix<T, M, N> m, double r){
-        return m *= (1/r);
-    }
-
-    template<typename T, int M1, int N1, int M2, int N2>
-    Matrix<T, M1, N2> operator*(const Matrix<T, M1, N1> &m1, const Matrix<T, M2, N2> &m2){
-        if(N1 != M2) throw std::runtime_error("array size mismatch for operator *");
-        Matrix<T, M1, N2> result;
-        for(int i = 0; i < M1; ++i)
-            for(int j = 0; j < N2; ++j)
-                for(int k = 0; k < N1; ++k)
-                  result(i, j) += m1(i, k)*m2(k, j);
-        return result;
-    }
-
-    template<typename T, int M, int N>
-    void Matrix<T, M, N>::to_eye(){
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j){
-                if(i == j)(*this)(i, j) = 1;
-                else (*this)(i, j) = 0;
-            }
-    }
-
-    template<typename T, int M, int N>
-    void Matrix<T, M, N>::to_one(){
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j)
-                (*this)(i, j) = 1;
-    }
-
-    template<typename T, int M, int N>
-    void Matrix<T, M, N>::to_zero(){
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j)
-                (*this)(i, j) = 0;
-    }
-
-    template<typename T, int M, int N>
-    bool Matrix<T, M, N>::is_diagonal(){
-        if(M != N) return false;
-        int flag = 0;
-        for(int i = 0; i < N; ++i)
-            for(int j = 0; j < N; ++j)
-                if(i!=j && (*this)(i, j)) { flag = 1; break; }
-        return flag ? false : true;
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, M, 1> Matrix<T, M, N>::getcol(int c){
-        Matrix<T, M, 1> col;
-        for(int i = 0; i < M; ++i)
-            col(i, 0) = (*this)(i, c);
-        return col;
-    }
-
-    template<typename T, int M, int N, int M1>
-    Matrix<T, M1, 1> getcol(Matrix<T, M, N> m, int c, int rs, int re){
-        Matrix<T, M1, 1> col;
-        if(M1-1 == re-rs) {
-            for(int i = rs; i <= re; ++i)
-                col(i-rs, 0) = m(i, c);
-        }
-        return col;
-    }
-
-    template<typename T, int M, int N>
-    void Matrix<T, M, N>::setcol(int c, const Matrix<T, M, 1> &obj){
-        for(int i = 0; i < M; ++i)
-            (*this)(i, c) = obj(i, 0);
-    }
-
-    template<typename T, int M, int N, int M1>
-    void setcol(Matrix<T, M, N> &m, int c, const Matrix<T, M1, 1> &obj, int rs, int re){
-        if(M1-1 == re-rs){
-            for(int i = rs; i <= re; ++i)
-                m(i, c) = obj(i-rs, 0);
-        }
-    }
-}
-
-#endif
+#endif  // MATRIX_H

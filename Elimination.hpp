@@ -12,17 +12,15 @@ namespace Lee{
     std::vector<T> pivot(Matrix<T, M, N> m){
         std::vector<T> pivots;
         T piv;
-        int flag = 0;
 
         for(int i = 0; i < M; ++i)                      // row pos of pivot
             for(int j = i; j < N; ++j){                 // col pos of pivot
-                flag = 0;
                 if(!m(i, j)){                           // pivot zero, row permutation
                     for(int r = i+1; r < M; ++r){
-                        if(m(r, j)) { m.permute(i, r); flag = 1; break; }
+                        if(m(r, j)) { m.permute(i, r); break; }
                     }
                 }
-                if(m(i, j) || flag){                    // pivot not zero, forward elimination
+                if(m(i, j)){                    // pivot not zero, forward elimination
                     piv = m(i, j);
                     pivots.push_back(piv);
                     for(int r = i+1; r < M; ++r){

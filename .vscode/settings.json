@@ -40,10 +40,29 @@
         "xtr1common": "cpp",
         "xutility": "cpp",
         "set": "cpp",
-        "xtree": "cpp"
+        "xtree": "cpp",
+        "complex": "cpp",
+        "sstream": "cpp",
+        "string": "cpp",
+        "chrono": "cpp",
+        "fstream": "cpp",
+        "list": "cpp",
+        "ratio": "cpp",
+        "deque": "cpp",
+        "functional": "cpp",
+        "iomanip": "cpp",
+        "map": "cpp",
+        "memory": "cpp",
+        "thread": "cpp",
+        "unordered_map": "cpp",
+        "xfunctional": "cpp",
+        "xhash": "cpp",
+        "xlocmon": "cpp",
+        "xloctime": "cpp"
     },
     "cSpell.words": [
         "cbegin",
+        "chrono",
         "cntc",
         "cntr",
         "cofactor",
@@ -52,6 +71,7 @@
         "gauss",
         "guassian",
         "keng",
+        "noexcept",
         "rref",
         "seidel"
     ]
