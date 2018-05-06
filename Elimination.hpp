@@ -4,29 +4,31 @@
 #include <vector>
 #include <tuple>
 #include "Matrix.hpp"
-#include "Basic.hpp"
 
 namespace Lee{
 
-    template<typename T, int M, int N>
-    std::vector<T> pivot(Matrix<T, M, N> m){
+    template<typename T>
+    std::vector<T> pivot(Matrix<T, 2> m){
+        size_t M = m.rows();
+        size_t N = m.cols();
+
         std::vector<T> pivots;
         T piv;
 
-        for(int i = 0; i < M; ++i)                      // row pos of pivot
-            for(int j = i; j < N; ++j){                 // col pos of pivot
+        for(size_t i = 0; i < m.rows(); ++i)                      // row pos of pivot
+            for(size_t j = i; j < m.cols(); ++j){                 // col pos of pivot
                 if(!m(i, j)){                           // pivot zero, row permutation
-                    for(int r = i+1; r < M; ++r){
-                        if(m(r, j)) { m.permute(i, r); break; }
+                    for(size_t r = i+1; r < M; ++r){
+                        if(m(r, j)) { m.rowPermute(i, r); break; }
                     }
                 }
                 if(m(i, j)){                    // pivot not zero, forward elimination
                     piv = m(i, j);
                     pivots.push_back(piv);
-                    for(int r = i+1; r < M; ++r){
+                    for(size_t r = i+1; r < M; ++r){
                         if(!m(r, j)) continue;          // variable zero, no need to eliminate
                         T base = m(r, j)/m(i, j);
-                        for(int c = j; c < N; ++c){
+                        for(size_t c = j; c < N; ++c){
                             m(r, c) -= (base*m(i, c));
                         }
                     }
@@ -39,23 +41,23 @@ namespace Lee{
 
     // Row echelon form: A -> U
     // Algorithm: Gaussian Elimination
-    template<typename T, int M, int N>
-    Matrix<T, M, N> upper(Matrix<T, M, N> m){
-        
-        int flag = 0;
-        for (int i = 0; i < M; ++i){                 // row pos of pivot
-           for (int j = i; j < N; ++j){              // col pos of pivot
-                flag = 0;
+    template<typename T>
+    Matrix<T, 2> upper(Matrix<T, 2> m){
+        size_t M = m.rows();
+        size_t N = m.cols();
+
+        for (size_t i = 0; i < M; ++i){                 // row pos of pivot
+           for (size_t j = i; j < N; ++j){              // col pos of pivot
                 if (!m(i, j)){                       // pivot zero, row permutation
-                    for (int r = i+1; r < M; ++r){
-                        if (m(r, j)) {m.permute(i, r); flag = 1; break;}  
+                    for (size_t r = i+1; r < M; ++r){
+                        if (m(r, j)) {m.rowPermute(i, r); break;}  
                     }
                 }
-                if (m(i, j) || flag){                // pivot not zero, forward elimination
-                    for (int r = i+1; r < M; ++r){  
+                if (m(i, j)){                // pivot not zero, forward elimination
+                    for (size_t r = i+1; r < M; ++r){  
                         if (!m(r, j)) continue;      // variable zero, no need to eliminate
                         T base = m(r, j)/m(i, j);
-                        for (int c = j; c < N; ++c){
+                        for (size_t c = j; c < N; ++c){
                             m(r, c) -= (base*m(i, c));
                         }
                     }
@@ -68,25 +70,27 @@ namespace Lee{
         return m;
     }
 
-    template<typename T, int M, int N>
-    Matrix<T, M, N> lower(Matrix<T, M, N> m){
-        int flag = 0;
-        for(int i = M-1; i >= 0; --i) {             // row pos of pivot
-            for(int j = N-1; j >= 0; --j){          // col pos of pivot
-                flag = 0;
+    template<typename T>
+    Matrix<T, 2> lower(Matrix<T, 2> m){
+        size_t M = m.rows();
+        size_t N = m.cols();
+
+        for(size_t i = M; i-- > 0; ) {             // row pos of pivot
+            for(size_t j = N; j-- > 0; ){          // col pos of pivot
                 if(!m(i, j)){                       // pivot zero, row permutation
-                    for(int r = i-1; r >= 0; --r){
-                        if(m(r, j)) { m.permute(i, r); flag = 1; }
+                    for(size_t r = i; r-- > 0; ){
+                        if(m(r, j)) { m.rowPermute(i, r); }
                     }
                 }
-                if(m(i, j) || flag){                // pivot not zero, forward elimination
-                    for(int r = i-1; r >= 0; --r){    
+                if(m(i, j)){                // pivot not zero, forward elimination
+                    for(size_t r = i; r-- > 0; ){    
                         if(!m(r, j)) continue;      // variable zero, no need to eliminate
                         T base = m(r, j)/m(i, j);
-                        for(int c = N-1; c >= 0; --c){
+                        for(size_t c = N; c-- > 0; ){
                             m(r, c) -= base*m(i, c);
                         }
                     }
+                    std::cout << m;
                     break;                          // pivot find in this col, break
                 }
                 else continue;                      // zero col, find pivot in next col
@@ -96,20 +100,23 @@ namespace Lee{
     }
 
 
-    template<typename T, int M, int N>
-    Matrix<T, M, N> rref(Matrix<T, M, N> m){
+    template<typename T>
+    Matrix<T, 2> rref(Matrix<T, 2> m){
+        size_t M = m.rows();
+        size_t N = m.cols();
+
         std::vector<std::tuple<T, int, int>> pivots;
         std::tuple<T, int, int> pivot;        
 
-        for (int i = 0; i < M; ++i){                // row pos of pivot
-           for (int j = i; j < N; ++j){             // col pos of pivot
+        for (size_t i = 0; i < M; ++i){                // row pos of pivot
+           for (size_t j = i; j < N; ++j){             // col pos of pivot
                 if (!m(i, j)){                      // pivot zero, row permutation
-                    for (int r = i+1; r < M; ++r){
-                        if (m(r, j)) {m.permute(i, r); break;}  
+                    for (size_t r = i+1; r < M; ++r){
+                        if (m(r, j)) {m.rowPermute(i, r); break;}  
                     }
                 }
                 if (m(i, j)){                       // pivot not zero, forward elimination
-                    for(int c = j+1; c < N; ++c){     // pivot row turn to identity
+                    for(size_t c = j+1; c < N; ++c){     // pivot row turn to identity
                         m(i, c) /= m(i, j);
                     }
                     std::get<0>(pivot) = m(i, j);
@@ -117,10 +124,10 @@ namespace Lee{
                     std::get<2>(pivot) = j;
                     pivots.push_back(pivot);
                     m(i, j) = 1;                    
-                    for (int r = i+1; r < M; ++r){    // forward elimination
+                    for (size_t r = i+1; r < M; ++r){    // forward elimination
                         if (!m(r, j)) continue;
                         T base = m(r, j);
-                        for (int c = j; c < N; ++c){
+                        for (size_t c = j; c < N; ++c){
                             m(r, c) -= (base*m(i, c));
                         }
                     }
@@ -131,10 +138,10 @@ namespace Lee{
         }
 
         for (auto p = pivots.rbegin(); p != pivots.rend()-1; ++p){      // do back elimination
-            for(int r = std::get<1>(*p)-1; r >= 0; --r){
-                T base = m(r, std::get<2>(*p));         
-                for(int c = r; c < N; ++c){
-                    m(r, c) -= (base*m(std::get<1>(*p), c));
+            for(size_t r = std::get<1>(*p); r > 0; --r){
+                T base = m(r-1, std::get<2>(*p));         
+                for(size_t c = r-1; c < N; ++c){
+                    m(r-1, c) -= (base*m(std::get<1>(*p), c));
                 }
             }
         }

@@ -6,16 +6,16 @@
 #include <type_traits>
 
 /*
-*  Matrix_slice: define the shape of a matrix(extents) and the mapping in memory(strides)
+*  Matrix_desc: define the shape of a matrix(extents) and the mapping in memory(strides)
 */
 
 namespace Lee{ 
 
     template<size_t N>
-    struct Matrix_slice{
+    struct Matrix_desc{
 
         // default initialization
-        Matrix_slice()
+        Matrix_desc()
             : start{0}, size{0}
             {
                 extents.fill(0);
@@ -23,7 +23,7 @@ namespace Lee{
             }
 
         // initialize with extents provided
-        Matrix_slice(size_t s, std::initializer_list<size_t> exts)
+        Matrix_desc(size_t s, std::initializer_list<size_t> exts)
             : start{s}
         {
             assert(exts.size() == N && "extents size not meet");    // initializer_list.size() is constexpr in C++14 
@@ -33,7 +33,7 @@ namespace Lee{
         }
 
         template<typename...Exts>               
-            Matrix_slice(size_t s, Exts...exts)
+            Matrix_desc(size_t s, Exts...exts)
                 : start{s}
             {
                 static_assert(sizeof...(Exts) == N, "extents size not meet");           
@@ -44,7 +44,7 @@ namespace Lee{
         
 
         // extents and strides provided
-        Matrix_slice(size_t s, std::initializer_list<size_t> exts, std::initializer_list<size_t> strs)
+        Matrix_desc(size_t s, std::initializer_list<size_t> exts, std::initializer_list<size_t> strs)
             : start{s}
         {
             assert(exts.size() == N && "extents size not meet");
@@ -75,6 +75,10 @@ namespace Lee{
             size_t arr[N] {size_t(dims)...};
             return start + std::inner_product(arr, arr+N, strides.begin(), size_t(0));            
         }
+        
+        bool operator==(const Matrix_desc<N> &m) const{
+            return size==m.size && extents == m.extents;
+        }
 
         // size and strides deduction by extents
         void strides_init(){
@@ -92,7 +96,7 @@ namespace Lee{
     };
 
     template<size_t N>
-    std::ostream& operator<<(std::ostream &os, const Matrix_slice<N> &m){
+    std::ostream& operator<<(std::ostream &os, const Matrix_desc<N> &m){
         os << "size: " << std::dec << m.size;
         os << " start: " << m.start; 
         os << " extents: ";
@@ -104,13 +108,13 @@ namespace Lee{
     }
 
     // template<> template<>
-    // size_t Matrix_slice<1>::operator()<>(size_t i)const{
+    // size_t Matrix_desc<1>::operator()<>(size_t i)const{
     //     std::cout << "yes";     // specialization choosing fail
     //     return i;
     // }
 
     // template<> template<>
-    // size_t Matrix_slice<2>::operator()<>(size_t i, size_t j)const{
+    // size_t Matrix_desc<2>::operator()<>(size_t i, size_t j)const{
     //     std::cout << "successful";  // specialization choosing fail
     //     return i*strides[0]+j;
     // }

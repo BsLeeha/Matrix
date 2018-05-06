@@ -90,6 +90,10 @@ namespace MatrixImpl{
         return true;
     }
 
+    template<typename M>
+    void assert_size_equal(const M &lhs, const M &rhs) {
+            assert((lhs.description() == rhs.description()) && "size not match");        
+    }
 
 }   //Matrix_Impl
 

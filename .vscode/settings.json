@@ -58,7 +58,8 @@
         "xfunctional": "cpp",
         "xhash": "cpp",
         "xlocmon": "cpp",
-        "xloctime": "cpp"
+        "xloctime": "cpp",
+        "numeric": "cpp"
     },
     "cSpell.words": [
         "cbegin",

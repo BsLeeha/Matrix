@@ -8,7 +8,7 @@
 #include <chrono>
 #include <algorithm>
 #include "Matrix_Test.cpp"
-#include "Matrix_Slice_Test.cpp"
+#include "Matrix_Desc_Test.cpp"
 #include "Matrix_ref_test.cpp"
 
 using namespace std;
@@ -17,7 +17,7 @@ int main(){
 try{
     auto t0 = chrono::high_resolution_clock::now();
 
-    Matrix_Slice_Test();
+    Matrix_Desc_Test();
     Matrix_Test();
     Matrix_ref_test();
 

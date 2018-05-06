@@ -10,7 +10,7 @@
 #include <type_traits>
 #include <cassert>
 #include "Matrix_Impl.hpp"
-#include "Matrix_Slice.hpp"
+#include "Matrix_Desc.hpp"
 #include "Matrix_ref.hpp"
 
 namespace Lee{
@@ -71,13 +71,12 @@ namespace Lee{
 
         // basic info
         static constexpr size_t order() { return N; }
+        const Matrix_desc<N>& description() const { return desc; }
+        size_t extention(size_t i) const { return desc.extents[i]; }
+
         size_t size() const { return desc.size; }
-        size_t extent(size_t i) const { return desc.extents[i]; }
-
-        size_t rows() const { return extent(0); }
-        size_t cols() const { return extent(1); }
-
-        const Matrix_slice<N>& descript() const { return desc; }
+        size_t rows() const { return extention(0); }
+        size_t cols() const { return extention(1); }
 
         std::vector<T>* elem() { return &elems; }
         T*       data() { return elems.data(); }
@@ -115,7 +114,7 @@ namespace Lee{
             static_assert(N-1>0, "1 dim matrix has no row to choose");
             assert(i < rows() && "row index over bound");
 
-            Matrix_slice<N-1> slice;
+            Matrix_desc<N-1> slice;
             slice.start = desc.start + i*desc.strides[0];
             std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
             slice.strides_init();
@@ -128,7 +127,7 @@ namespace Lee{
             static_assert(N-1>0, "1 dim matrix has no row to choose");            
             assert(i < rows() && "row index over bound");
 
-            Matrix_slice<N-1> slice;
+            Matrix_desc<N-1> slice;
             slice.start = desc.start + i*desc.strides[0];
             std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
             slice.strides_init();
@@ -141,7 +140,7 @@ namespace Lee{
             static_assert(N-1>0, "1 dim matrix has no col to choose");            
             assert(i < cols() && "col index over bound");
        
-            Matrix_slice<N-1> coldesc;
+            Matrix_desc<N-1> coldesc;
             coldesc.start = desc.start + i*desc.strides[1];
             std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
             if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
@@ -157,7 +156,7 @@ namespace Lee{
             static_assert(N-1>0, "1 dim matrix has no col to choose");            
             assert(i < cols() && "col index over bound");
        
-            Matrix_slice<N-1> coldesc;
+            Matrix_desc<N-1> coldesc;
             coldesc.start = desc.start + i*desc.strides[1];
             std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
             if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
@@ -169,9 +168,16 @@ namespace Lee{
             return res;             
         }
 
+        // matrix equal judge
+        bool operator==(const Matrix<T, N> &m) const{
+            MatrixImpl::assert_size_equal(*this, m);
+
+            return *data() == *m.data();
+        }
+
         // matrix add
         Matrix<T, N>& operator+=(const Matrix<T, N> &m){
-            assert(rows() == m.rows() && cols() == m.cols() && "cannot add");
+            MatrixImpl::assert_size_equal(*this, m);
 
             std::transform(begin(), end(), m.begin(), elems.begin(), std::plus<T>());
             return *this;
@@ -179,7 +185,7 @@ namespace Lee{
 
         // matrix substract
         Matrix<T, N>& operator-=(const Matrix<T, N> &m){
-            assert(rows() == m.rows() && cols() == m.cols() && "cannot subtract");
+            MatrixImpl::assert_size_equal(*this, m);
 
             std::transform(begin(), end(), m.begin(), elems.begin(), std::minus<T>());
             return *this;
@@ -204,9 +210,37 @@ namespace Lee{
             return res;
         }
 
+        // row permute
+        void rowPermute(size_t i, size_t j){
+            for(size_t k = 0; k < desc.size/desc.extents[0]; ++k){
+                T temp = elems[desc.start + i*desc.strides[0] + k];
+                
+                elems[desc.start + i*desc.strides[0] + k] = 
+                elems[desc.start + j*desc.strides[0] + k];
+                
+                elems[desc.start + j*desc.strides[0] + k] = temp;
+            }
+        }
+
+        // col permute
+        void colPermute(size_t i, size_t j){
+            for(size_t r = 0; r < rows(); ++r){
+                for(size_t k = 0; k < desc.size/desc.extents[0]/desc.extents[1]; ++k){
+                    T temp = elems[desc.start + r*desc.strides[0] + i*desc.strides[1] + k];
+
+                    elems[desc.start + r*desc.strides[0] + i*desc.strides[1] + k] = 
+                    elems[desc.start + r*desc.strides[0] + j*desc.strides[1] + k];
+
+                    elems[desc.start + r*desc.strides[0] + j*desc.strides[1] + k] = temp;
+                }
+            }
+        }
+
+        void to_eye() { std::for_each(elems.begin(), elems.end(), [](T &item){ item = 1; }); }
+        void to_zero() { std::for_each(elems.begin(), elems.end(), [](T &item){ item = 0; }); }
 
     private:
-        Lee::Matrix_slice<N> desc;                // slice descripting extents of each dimension    
+        Lee::Matrix_desc<N> desc;                // slice descripting extents of each dimension    
         std::vector<T> elems;                     // elements
     };
 
@@ -271,13 +305,10 @@ namespace Lee{
     };
 
     /* Convenient Alias */
-    template<typename T>
     using Real_Scalar = Matrix<double, 0>;
 
-    template<typename T>
     using Real_Vector = Matrix<double, 1>;
 
-    template<typename T>
     using Real_Matrix = Matrix<double, 2>;
 
 
