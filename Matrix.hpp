@@ -1,335 +1,829 @@
-#ifndef MATRIX_H
-#define MATRIX_H
+#pragma once
 
 #include <iostream>
 #include <vector>
-#include <array>
 #include <cstdlib>
 #include <tuple>
+#include <cassert>
 #include <algorithm>
 #include <type_traits>
-#include <cassert>
-#include "Matrix_Impl.hpp"
-#include "Matrix_Desc.hpp"
-#include "Matrix_ref.hpp"
+#include <functional>
+
+/*
+** Operation define:
+** classes
+** | Matrix<T, M, N>
+** | Scalar = Matrix<T, 1, 1>
+** | RealScalar = Matrix<double, 1, 1>
+** | Vetcor = Matrix<T, M, 1> or Matrix<T, 1, N>
+** | RealVetcor = Matrix<double, M, 1> or Matrix<T, 1, N>
+** | EyeMatrix = Matrix<T, N, N>
+** | RealEyeMatrix = Matrix<double, N, N>
+** initialize
+** | Matrix a
+** | Matrix a{...}
+** | Matrix a = {...}
+** | Matrix a(b)
+** | Matrix a = Matrix b
+** visit
+** | a(...)
+** | a.row(i)
+** | a.col(i)
+** 
+*/
+
+namespace MatrixImpl{
+    template<typename T, size_t N>
+    struct NestedInitializerList;    
+
+    template<typename M>
+    void index_bounds_check(const M &m, size_t r, size_t c);
+
+    template<typename M>
+    void matrix_valid(const M &m);
+
+    template<typename M, typename...Dims>
+    void matrix_valid(const M &m, const Dims &...dims);      
+
+    template<typename T>
+    struct IsTransType;          
+}
 
 namespace Lee{
 
-    template<typename T, size_t N>
-    class Matrix_base{
-    public:
-    private:
+    template<typename T, size_t M, size_t N, typename V>
+    class Matrix;
     
-    };
+    using RealScalar = Matrix<double, 1, 1, std::vector<double>>;
+    
+    template<typename T, size_t N>
+    using Vectorr = Matrix<T, 1, N, std::vector<T>>;
+    
+    template<typename T, size_t M>
+    using Vectorc = Matrix<T, M, 1, std::vector<T>>;
+
+    template<size_t N>
+    using RealVectorr = Matrix<double, 1, N, std::vector<double>>;
+    
+    template<size_t M>
+    using RealVectorc = Matrix<double, M, 1, std::vector<double>>;
 
     template<typename T, size_t N>
-    using Matrix_initializer = MatrixImpl::NestedInitializerListN<T, N>;
+    using EyeMatrix = Matrix<T, N, N, std::vector<T>>;    
 
-    template<typename T, size_t N>      // N dimension
+    template<size_t N>
+    using RealEyeMatrix = Matrix<double, N, N, std::vector<double>>;
+
+    template<typename T, size_t N>
+    using NestedInitializerListN = typename MatrixImpl::NestedInitializerList<T, N>::type;
+
+    template<typename T, typename V, typename F>
+    class applyProxy;
+
+    template<typename T, typename V1, typename V2, typename F>
+    class binaryProxy;    
+
+    template<typename T, size_t M, size_t N, typename V = std::vector<T>>
     class Matrix{
-    template<typename U>
-    friend std::ostream& operator<<(std::ostream &os,  Matrix<U, 1> m);
-    template<typename U, size_t M>
-    friend std::ostream& operator<<(std::ostream &os, Matrix<U, M> m);
-
     public:
-        // Conventional aliases
-        using value_type = T;
-        using iterator = typename std::vector<T>::iterator;
-        using const_iterator = typename std::vector<T>::const_iterator;
-        using reverse_iterator = typename std::vector<T>::reverse_iterator;
-        using const_reverse_iterator = typename std::vector<T>::const_reverse_iterator;
+        using value_type     = T;
+        using iterator       = typename V::iterator;
+        using const_iterator = typename V::const_iterator;
 
-        // Initialization
-        Matrix() = default;                                         // default
-        Matrix(const Matrix &) = default;                           // copy
-        Matrix& operator=(const Matrix&) = default;     
-        Matrix(Matrix &&) = default;                                // move
-        Matrix& operator=(Matrix&&) = default;
-        ~Matrix() = default;
+        // Constructors
+        Matrix(){
+            elems.resize(M*N); 
+            std::fill(elems.begin(), elems.end(), 0);
+            
+            assert(elems.size() == M*N && "construction fail");
+        }                        
 
-        template<typename...Ts>                                     // (), initialize dims from extents
-        Matrix(Ts...ts)
-            : desc{0, ts...}, elems(MatrixImpl::product(ts...)){}
+        explicit Matrix(size_t cnt, T elem){
+            assert(cnt == M*N && "overinput");
 
-        Matrix(Matrix_initializer<T, N> list){                      // {}, initialize elems from nested initializer_list
-            desc.start = 0;
-            MatrixImpl::derive_extents<N>(list, desc.extents.data());
-            desc.strides_init();
-            elems.reserve(desc.size);
-            MatrixImpl::derive_elems<T, N>(list, elems);
+            elems.resize(M*N);
+            std::fill(elems.begin(), elems.end(), elem);
 
-            assert(desc.size == elems.size() && "extents size and elems size not match");
+            assert(elems.size() == M*N && "construction fail");
         }
-        Matrix& operator=(Matrix_initializer<T, N>);
 
-        // template<typename U, typename std::enable_if<(N>1), void>::type* = nullptr>
-        // Matrix(std::initializer_list<U>) = delete;                  // disable {} initialization with extents
+        Matrix(NestedInitializerListN<T, 1> il)
+        {
+            assert(il.size() <= size() && "overinput");            
+            
+            elems.assign(il);
+            elems.insert(elems.end(), size()-elems.size(), static_cast<T>(0));
 
-        // template<typename U>
-        // Matrix& operator=(std::initializer_list<U>) = delete;
+            assert(elems.size() == M*N && "construction fail");            
+        }
 
-        // basic info
-        static constexpr size_t order() { return N; }
-        const Matrix_desc<N>& description() const { return desc; }
-        size_t extention(size_t i) const { return desc.extents[i]; }
+        Matrix(NestedInitializerListN<T, 2> il){
+            assert(il.size() <= M && "rows overinput");
 
-        size_t size() const { return desc.size; }
-        size_t rows() const { return extention(0); }
-        size_t cols() const { return extention(1); }
+            for(auto i : il){
+                assert(i.size() <= N && "cols overinput");
+                
+                std::copy(i.begin(), i.end(), std::back_inserter(elems));
+                elems.insert(elems.end(), N-i.size(), static_cast<T>(0));
+            }
+            elems.insert(elems.end(), size()-elems.size(), static_cast<T>(0));
 
-        std::vector<T>* elem() { return &elems; }
-        T*       data() { return elems.data(); }
-        const T* data() const { return elems.data(); }    
+            assert(elems.size() == M*N && "construction fail");                
+        }        
+
+        Matrix(const V &vec) : elems{vec} {}
+
+        template<typename V1>
+        Matrix(const Matrix<T, M, N, V1> &rhs){
+            MatrixImpl::matrix_valid(rhs);
+
+            elems.resize(size());
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = rhs(i, j); 
+        }
+
+        Matrix(Matrix &&rhs) = default;      
+
+        ~Matrix() = default;
+        
+        // assignments
+        Matrix& operator=(const Matrix &rhs){
+            if(this != &rhs) elems = rhs.elems;
+
+            return *this;
+        }
+
+        Matrix& operator=(const Matrix &&rhs){           
+            if(this != &rhs) elems = std::move(rhs.elems);
+
+            return *this;
+        }
+
+        Matrix& operator=(NestedInitializerListN<T, 1> il){
+            assert(il.size() <= size() && "overassign");            
+            
+            elems.assign(il);
+            elems.insert(elems.end(), size()-elems.size(), static_cast<T>(0));
+
+            assert(elems.size() == M*N && "assignment fail");                       
+            return *this;         
+        }
+
+        Matrix& operator=(NestedInitializerListN<T, 2> il){
+            assert(il.size() <= M && "rows overassign");
+
+            elems.clear();
+            
+            for(auto i : il){
+                assert(i.size() <= N && "cols overassign");
+                
+                std::copy(i.begin(), i.end(), std::back_inserter(elems));
+                elems.insert(elems.end(), N-i.size(), static_cast<T>(0));
+            }
+
+            elems.insert(elems.end(), size()-elems.size(), static_cast<T>(0));
+
+            assert(elems.size() == M*N && "assignment fail");  
+            return *this;                              
+        }        
+
+        template<typename V1>
+        Matrix& operator=(const Matrix<T, M, N, V1> &rhs){
+            MatrixImpl::matrix_valid(rhs);
+
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = rhs(i, j);
+            return *this;
+        }
+
+        // member functions
+        static constexpr size_t rows() { return M; }
+
+        static constexpr size_t cols() { return N; }
+
+        static constexpr size_t size() { return M*N; }
+
+        template<typename F>
+        Matrix<T, M, N, applyProxy<T, V, F>> apply(F f){
+            return applyProxy<T, V, F>(data(), f);
+        }
+        
+        // element access
+        template<typename Q = V>
+        typename std::enable_if<MatrixImpl::IsTransType<Q>::value, T&>::type
+        operator()(size_t i, size_t j){
+            MatrixImpl::index_bounds_check(*this, i, j);   
+            
+            return elems(i, j);
+        }
+
+        template<typename Q = V>
+        typename std::enable_if<!MatrixImpl::IsTransType<Q>::value, T&>::type
+        operator()(size_t i, size_t j) { 
+            MatrixImpl::index_bounds_check(*this, i, j);   
+
+            return elems[i*N+j]; 
+        }    
+
+        template<typename Q = V>
+        typename std::enable_if<MatrixImpl::IsTransType<Q>::value, T>::type
+        operator()(size_t i, size_t j) const {
+            MatrixImpl::index_bounds_check(*this, i, j);   
+            
+            return elems(i, j);
+        }
+
+        template<typename Q = V>
+        typename std::enable_if<!MatrixImpl::IsTransType<Q>::value, T>::type
+        operator()(size_t i, size_t j) const { 
+            MatrixImpl::index_bounds_check(*this, i, j);
+
+            return elems[i*N+j]; 
+        }  
+
+        const V& data() const { return elems; }
 
         iterator begin() { return elems.begin(); }
+
         const_iterator begin() const { return elems.begin(); }
-        const_iterator cbegin() const {return elems.cbegin(); }
-        
+
         iterator end() { return elems.end(); }
-        const_iterator end() const { return elems.end(); }        
-        const_iterator cend() const { return elems.cend(); }            
 
+        const_iterator end() const { return elems.end(); }
 
-        // fortan style elem access
-        template<typename...Dims>
-        T& operator()(Dims...dims){
-            assert(MatrixImpl::Request_index(dims...) && "index type wrong");
-
-            return elems[desc(dims...)];
+        // submatrix access
+        
+        // unary operations
+        Matrix<T, M, N, applyProxy<T, V, std::negate<T>>> operator-(){
+            return apply(std::negate<T>());
         }
 
-        template<typename...Dims>
-        const T& operator()(Dims...dims) const{
-            assert(MatrixImpl::Request_index(dims...) && "index type wrong");
+        // binary operations
+        template<typename V1>
+        Matrix<T, M, N, binaryProxy<T, V, V1, std::plus<T>>> operator+(const Matrix<T, M, N, V1> &rhs){
+            return binaryProxy<T, V, V1, std::plus<T>>(elems, rhs.data(), std::plus<T>());
+        }
+
+        template<typename V1>
+        Matrix<T, M, N, binaryProxy<T, V, V1, std::minus<T>>> operator-(const Matrix<T, M, N, V1> &rhs){
+            return binaryProxy<T, V, V1, std::minus<T>>(elems, rhs.data(), std::minus<T>());
+        }
+
+
+        // arithmetic operations
+        Matrix& operator+=(const Matrix &m){
+            MatrixImpl::matrix_valid(*this, m);       
             
-            return elems[desc(dims...)];
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) += m(i, j);
+            return *this;            
         }
 
-        // row/col access
-        Matrix_ref<T, N-1>       operator[](size_t i) { return row(i); }
-        Matrix_ref<const T, N-1> operator[](size_t i) const { return row(i); }
-
-        Matrix_ref<T, N-1>       row(size_t i){
-            static_assert(N-1>0, "1 dim matrix has no row to choose");
-            assert(i < rows() && "row index over bound");
-
-            Matrix_desc<N-1> slice;
-            slice.start = desc.start + i*desc.strides[0];
-            std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
-            slice.strides_init();
-
-            Matrix_ref<T, N-1> res{slice, &elems};
-            return res;
+        Matrix& operator-=(const Matrix &m){
+            MatrixImpl::matrix_valid(*this, m);       
+            
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) -= m(i, j);
+            return *this;            
         }
 
-         Matrix_ref<const T, N-1> row(size_t i) const{
-            static_assert(N-1>0, "1 dim matrix has no row to choose");            
-            assert(i < rows() && "row index over bound");
-
-            Matrix_desc<N-1> slice;
-            slice.start = desc.start + i*desc.strides[0];
-            std::copy(desc.extents.begin()+1, desc.extents.end(), slice.extents.begin());
-            slice.strides_init();
-
-            Matrix_ref<T, N-1> res{slice, &elems};
-            return res;        
+        Matrix& operator*=(double r){
+            MatrixImpl::matrix_valid(*this);       
+            
+            for(size_t i = 0; i != M; ++i)
+                for(size_t j = 0; j != N; ++j)
+                    (*this)(i, j) *= r;
+            return *this;            
         }
 
-        Matrix_ref<T, N-1>       col(size_t i){
-            static_assert(N-1>0, "1 dim matrix has no col to choose");            
-            assert(i < cols() && "col index over bound");
-       
-            Matrix_desc<N-1> coldesc;
-            coldesc.start = desc.start + i*desc.strides[1];
-            std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
-            if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
-            coldesc.size = desc.size/desc.extents[1];
-            std::copy(desc.strides.begin(), desc.strides.begin()+1, coldesc.strides.begin());
-            if(N != 2) std::copy(desc.strides.begin()+2, desc.strides.end(), coldesc.strides.begin()+1);            
-
-            Matrix_ref<T, N-1> res{coldesc, &elems};
-            return res;             
-        }
-
-        Matrix_ref<const T, N-1> col(size_t i) const{
-            static_assert(N-1>0, "1 dim matrix has no col to choose");            
-            assert(i < cols() && "col index over bound");
-       
-            Matrix_desc<N-1> coldesc;
-            coldesc.start = desc.start + i*desc.strides[1];
-            std::copy(desc.extents.begin(), desc.extents.begin()+1, coldesc.extents.begin());
-            if(N != 2) std::copy(desc.extents.begin()+2, desc.extents.end(), coldesc.extents.begin()+1);
-            coldesc.size = desc.size/desc.extents[1];
-            std::copy(desc.strides.begin(), desc.strides.begin()+1, coldesc.strides.begin());
-            if(N != 2) std::copy(desc.strides.begin()+2, desc.strides.end(), coldesc.strides.begin()+1);            
-
-            Matrix_ref<T, N-1> res{coldesc, &elems};
-            return res;             
-        }
-
-        // matrix equal judge
-        bool operator==(const Matrix<T, N> &m) const{
-            MatrixImpl::assert_size_equal(*this, m);
-
-            return *data() == *m.data();
-        }
-
-        // matrix add
-        Matrix<T, N>& operator+=(const Matrix<T, N> &m){
-            MatrixImpl::assert_size_equal(*this, m);
-
-            std::transform(begin(), end(), m.begin(), elems.begin(), std::plus<T>());
-            return *this;
-        }
-
-        // matrix substract
-        Matrix<T, N>& operator-=(const Matrix<T, N> &m){
-            MatrixImpl::assert_size_equal(*this, m);
-
-            std::transform(begin(), end(), m.begin(), elems.begin(), std::minus<T>());
-            return *this;
-        }
-
-        // scalar multiplication
-        Matrix<T, N>& operator*=(T m){
-            std::for_each(begin(), end(), [m](T &item){ item *= m;});
-            return *this;
+        Matrix& operator/=(double r){
+            MatrixImpl::matrix_valid(*this);       
+            
+            return (*this) *= 1/r;
         }
 
         // matrix multiplication
-        Matrix<T, 2> operator*=(const Matrix<T, 2> &m){
-            assert(cols() == m.rows() && "cannot multiply");
-
-            Matrix<T, 2> res(rows(), m.cols());
-            for(size_t i = 0; i < rows(); ++i)
-                for(size_t j = 0; j < m.cols(); ++j)
-                    for(size_t k = 0; k < cols(); ++k){
-                        res(i, j) += (*this)(i, k) * m(k, j);
-                    }
+        template<size_t M1, size_t N1>
+        Matrix<T, M, N1> operator*(const Matrix<T, M1, N1> &m){
+            MatrixImpl::matrix_valid(*this, m);       
+            
+            if(N != M1) throw std::runtime_error("matrix size mismatch for operator *");
+            Matrix<T, M, N1> res;
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N1; ++j)
+                    for(size_t k = 0; k < N; ++k)
+                        res(i, j) += (*this)(i, k)*m(k, j);
             return res;
         }
 
-        // row permute
-        void rowPermute(size_t i, size_t j){
-            for(size_t k = 0; k < desc.size/desc.extents[0]; ++k){
-                T temp = elems[desc.start + i*desc.strides[0] + k];
-                
-                elems[desc.start + i*desc.strides[0] + k] = 
-                elems[desc.start + j*desc.strides[0] + k];
-                
-                elems[desc.start + j*desc.strides[0] + k] = temp;
-            }
+        void permute(size_t r1, size_t r2);
+
+        bool is_invertible(){ return (M==N) && (rank(*this) == N); }
+
+        void to_eye(){
+            MatrixImpl::matrix_valid(*this);       
+            
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j){
+                    if(i == j)(*this)(i, j) = 1;
+                    else (*this)(i, j) = 0;
+                }            
         }
 
-        // col permute
-        void colPermute(size_t i, size_t j){
-            for(size_t r = 0; r < rows(); ++r){
-                for(size_t k = 0; k < desc.size/desc.extents[0]/desc.extents[1]; ++k){
-                    T temp = elems[desc.start + r*desc.strides[0] + i*desc.strides[1] + k];
+        void to_one(){
+            MatrixImpl::matrix_valid(*this);       
 
-                    elems[desc.start + r*desc.strides[0] + i*desc.strides[1] + k] = 
-                    elems[desc.start + r*desc.strides[0] + j*desc.strides[1] + k];
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = 1;            
+        }
 
-                    elems[desc.start + r*desc.strides[0] + j*desc.strides[1] + k] = temp;
+        void to_zero(){
+            MatrixImpl::matrix_valid(*this);       
+            
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = 0;            
+        }
+
+        bool is_diagonal(){
+            MatrixImpl::matrix_valid(*this);       
+            
+            if(M != N) return false;
+            int flag = 0;
+            for(size_t i = 0; i < N; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    if(i!=j && (*this)(i, j)) { flag = 1; break; }
+            return flag ? false : true;            
+        }
+
+        // slice operations
+        Matrix<T, 1, N> row(size_t r){
+            MatrixImpl::index_bounds_check(*this, r);
+
+            Matrix<T, 1, N> res;
+            for(size_t i = 0; i < N; ++i)
+                res(0, i) = (*this)(r, i);
+            return res;
+        }
+
+        Matrix<T, M, 1> col(size_t c){
+            MatrixImpl::index_bounds_check(*this, c);
+
+            Matrix<T, M, 1> res;
+            for(size_t i = 0; i < M; ++i)
+                res(i, 0) = (*this)(i, c);
+            return res;            
+        }
+
+        void setcol(size_t c, const Matrix<T, M, 1> &);
+
+        // concatenate operations
+
+    private:
+        V elems;
+
+    };
+
+    template<typename T, size_t M, size_t N, typename V>
+    std::ostream& operator<<(std::ostream &os, const Matrix<T, M, N, V> &m){
+        MatrixImpl::matrix_valid(m);       
+
+        for(size_t i = 0; i < M; ++i){
+            for(size_t j = 0; j < N; ++j){
+                os.width(8);
+                os.precision(3);
+                os << std::fixed << m(i, j) << " ";
+            }
+            os << '\n';
+        }
+        os << '\n';
+        return os;
+    }
+
+    template<typename T, size_t M, size_t N>
+    std::istream& operator>>(std::istream &is, Matrix<T, M, N> &m){
+        char c;
+        if(is>>c && c=='['){            // start with a '['
+            for(size_t i = 0; i < M; ++i){
+                for(size_t j = 0; j < N; ++j){
+                    is >> m(i, j);
                 }
+                if(i!=M-1 && (is.get()!= ';')) { std::cout <<"\nmissing delimeter ';'\n"; return is; }
             }
+            if(is.get()!=']') std::cout << "\nmissing ']', but that's ok!\n";
+            return is;
+        }
+        else std::cout << "\nshould start with '['\n";
+        return is;
+    }
+
+    // concatenate 
+    // vertcat
+    template<typename T, size_t M1, size_t M2, size_t N>
+    Matrix<T, M1+M2, N> vertcat(const Matrix<T, M1, N> &m1, const Matrix<T, M2, N> &m2){
+        MatrixImpl::matrix_valid(m1, m2);
+
+        Matrix<T, M1+M2, N> res;
+        for(size_t i = 0; i < M1+M2; ++i)
+            for(size_t j = 0; j < N; ++j)
+                if(i < M1) res(i, j) = m1(i, j);
+                else res(i, j) = m2(i-M1, j);
+
+        return res;
+    }
+
+    template<typename T, size_t M, size_t N1, size_t N2>
+    Matrix<T, M, N1+N2> horzcat(const Matrix<T, M, N1> &m1, const Matrix<T, M, N2> &m2){
+        MatrixImpl::matrix_valid(m1, m2);
+
+        Matrix<T, M, N1+N2> res;
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N1+N2; ++j)
+                if(j < N1) res(i, j) = m1(i, j);
+                else res(i, j) = m2(i, j-N1);
+
+        return res;
+    }
+
+    template<typename T, typename P>
+    struct Iterator{
+        const P &proxy;
+        size_t pos;
+
+        Iterator(const P &nproxy, size_t npos) : proxy{nproxy}, pos{npos} {}
+
+        const T operator*() {
+            return proxy[pos];
         }
 
-        void to_eye() { std::for_each(elems.begin(), elems.end(), [](T &item){ item = 1; }); }
-        void to_zero() { std::for_each(elems.begin(), elems.end(), [](T &item){ item = 0; }); }
+        Iterator& operator++(){
+            ++pos;
+            return *this;
+        }
+
+        Iterator& operator--(){
+            --pos;
+            return *this;
+        }
+
+        Iterator& operator+(size_t i){
+            pos += i;
+            return *this;
+        }
+
+        Iterator& operator-(size_t i){
+            pos -= i;
+            return *this;
+        }
+
+        bool operator==(const Iterator &rhs) const{
+            return pos == rhs.pos;
+        }
+
+        bool operator!=(const Iterator &rhs) const{
+            return pos == rhs.pos;
+        }
+
+    };
+
+
+    template<typename T, typename P>
+    struct ConstIterator{
+        const P &proxy;
+        size_t pos;
+
+        ConstIterator(const P &nproxy, size_t npos) : proxy{nproxy}, pos{npos} {}
+
+        const T operator*() const{
+            return proxy[pos];
+        }
+
+        ConstIterator& operator++(){
+            ++pos;
+            return *this;
+        }
+
+        ConstIterator& operator--(){
+            --pos;
+            return *this;
+        }
+
+        ConstIterator& operator+(size_t i){
+            pos += i;
+            return *this;
+        }
+
+        ConstIterator& operator-(size_t i){
+            pos -= i;
+            return *this;
+        }
+
+        bool operator==(const ConstIterator &rhs) const{
+            return pos == rhs.pos;
+        }
+
+        bool operator!=(const ConstIterator &rhs) const{
+            return pos == rhs.pos;
+        }
+
+    };    
+
+    template<typename T>
+    class Scalar{
+    public:
+        explicit Scalar(const T &e) : elem{e} {}
+
+        const T& operator[](size_t i) const{
+            return elem;
+        }
+
+    private: 
+        T elem;
+    };
+
+    template<typename T, typename V, typename F>
+    class applyProxy{
+    public:
+        using value_type     = T;
+        using iterator       = Iterator<T, applyProxy>;
+        using const_iterator = ConstIterator<T, applyProxy>;
+
+        applyProxy(const V &left, F &function) : lhs{left}, func{function} {}
+
+        T operator[](size_t i) const{
+            return func(lhs[i]);
+        }
+
+        size_t size() const{
+            return lhs.size();
+        }
+
+        iterator begin(){
+            return Iterator<T, applyProxy>(*this, 0);
+        }
+
+        const_iterator begin() const {
+            return ConstIterator<T, applyProxy>(*this, 0);            
+        }
+
+        iterator end(){
+            return Iterator<T, applyProxy>(*this, size());
+        }
+
+        const_iterator end() const {
+            return ConstIterator<T, applyProxy>(*this, size());
+        }
 
     private:
-        Lee::Matrix_desc<N> desc;                // slice descripting extents of each dimension    
-        std::vector<T> elems;                     // elements
+        const V &lhs;
+        const F &func;
     };
 
-    // overload ouput
-    template<typename T>
-    std::ostream& operator<<(std::ostream &os,  Matrix<T, 1> m){
-        os << m.desc;        
-        os << '{';
-        for(size_t i = 0; i < m.size(); ++i){
-            os << m(i);
-            if(i+1 != m.size()) os << ", ";
-        }
-        os << "}\n";
-        return os;
-    }  
-
-    template<typename T, size_t N>
-    std::ostream& operator<<(std::ostream &os,  Matrix<T, N> m){
-        os << m.desc;
-        for(size_t i = 0; i < m.rows(); ++i){
-            os << m[i] << '\n';
-        }
-        return os;
-    }       
-
-    /* Scalar Class Specialization */
-    template<typename T>
-    class Matrix<T, 0>{
+    template<typename T, typename V1, typename V2, typename F>
+    class binaryProxy{
     public:
-        using value_type = T;
+        using value_type     = T;
+        using iterator       = Iterator<T, binaryProxy>;
+        using const_iterator = ConstIterator<T, binaryProxy>;
 
-        // initialize
-        Matrix() = default;
-        Matrix(const Matrix<T, 0>&) = default;
-        Matrix& operator=(const Matrix<T, 0> &) = default;
-        Matrix(const T &x) : elem{x} {}
-        Matrix& operator=(const T &x) { elem = x; return *this; }
+        binaryProxy(const V1 &left, const V2 &right, const F &f) 
+            : lhs{left}, rhs{right}, func{f} {}
+        
+        T operator[](size_t i) const{
+            return func(lhs[i], rhs[i]);
+        }
 
-        // elem access
-        T& operator()() { return elem; }
-        const T& operator()() const { return elem; }
+        size_t size() const { return lhs.size(); }
+
+        iterator begin(){
+            return Iterator<T, binaryProxy>(*this, 0);
+        }
+
+        const_iterator begin() const {
+            return ConstIterator<T, binaryProxy>(*this, 0);
+        }
+
+        iterator end(){
+            return Iterator<T, binaryProxy>(*this, size());
+        }
+
+        const_iterator end() const {
+            return ConstIterator<T, binaryProxy>(*this, size());
+        }
 
     private:
-        T elem;  
+        const V1 &lhs;
+        const V2 &rhs;
+        const F  &func;
     };
 
-    template<typename T>
-    std::ostream& operator<<(std::ostream& os, const Matrix<T, 0> &m){
-        os << m();
-        return os;
-    }
-
-    /* Random Class for test */
-    template<typename T, size_t N>
-    class RandomMatrix : public Matrix<T, N>{
+    template<typename T, typename V, typename F>
+    class binaryProxyRScalar{
     public:
-        RandomMatrix(size_t m, size_t n)
-        : Matrix<T, N>(m, n){
-            srand(time(NULL));
-            for(auto &i : *Matrix<T, N>::elem()) i = rand()%100;
-        }     
+        using value_type     = T;
+        using iterator       = Iterator<T, binaryProxyRScalar>;
+        using const_iterator = ConstIterator<T, binaryProxyRScalar>;
+
+        binaryProxyRScalar(const V &left, Scalar<T> right, const F &f) 
+            : lhs{left}, rhs{right}, func{f} {}
+
+        T operator[](size_t i) const{
+            return func(lhs[i], rhs[i]);
+        }
+
+        size_t size() const { return lhs.size(); }
+
+        iterator begin(){
+            return Iterator<T, binaryProxyRScalar>(*this, 0);
+        }
+
+        const_iterator begin() const{
+            return ConstIterator<T, binaryProxyRScalar>(*this, 0);
+        }
+
+        iterator end(){
+            return Iterator<T, binaryProxyRScalar>(*this, size());
+        }
+
+        const_iterator end() const{
+            return ConstIterator<T, binaryProxyRScalar>(*this, size());
+        }
+
+    private:
+        const V   &lhs;
+        Scalar<T> rhs;
+        const F   &func;
     };
 
-    /* Convenient Alias */
-    using Real_Scalar = Matrix<double, 0>;
+    template<typename T, typename V, typename F>
+    class binaryProxyLScalar{
+    public:
+        using value_type     = T;
+        using iterator       = Iterator<T, binaryProxyLScalar>;
+        using const_iterator = ConstIterator<T, binaryProxyLScalar>;
 
-    using Real_Vector = Matrix<double, 1>;
+        binaryProxyLScalar(Scalar<T> left, const V &right, const F &f) 
+            : lhs{left}, rhs{right}, func{f} {}
 
-    using Real_Matrix = Matrix<double, 2>;
+        T operator[](size_t i) const{
+            return func(lhs[i], rhs[i]);
+        }
 
+        size_t size() const { return rhs.size(); }
 
-    // Matrix add
-    template<typename T, size_t N>
-    Matrix<T, N> operator+(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
-        return lhs += rhs;
+        iterator begin(){
+            return Iterator<T, binaryProxyLScalar>(*this, 0);
+        }
+
+        const_iterator begin() const{
+            return ConstIterator<T, binaryProxyLScalar>(*this, 0);
+        }
+
+        iterator end(){
+            return Iterator<T, binaryProxyLScalar>(*this, size());
+        }
+
+        const_iterator end() const{
+            return ConstIterator<T, binaryProxyLScalar>(*this, size());
+        }
+
+    private:
+        Scalar<T> lhs;    
+        const V   &rhs;
+        const F   &func;
+    };
+
+    // unary operations
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::plus<T>>> 
+    operator+(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::plus<T>>(lhs.data(), Scalar<T>{elem}, std::plus<T>());
     }
 
-    // Matrix subtract
-    template<typename T, size_t N>
-    Matrix<T, N> operator-(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
-        return lhs -= rhs;
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyLScalar<T, V, std::plus<T>>>
+    operator+(const T &elem, const Matrix<T, M, N, V> &rhs){
+        return binaryProxyLScalar<T, V, std::plus<T>>(Scalar<T>{elem}, rhs.data(), std::plus<T>());
     }
 
-    // Matrix multiplication
-    template<typename T, size_t N>
-    Matrix<T, N> operator*(Matrix<T, N> lhs, const Matrix<T, N> &rhs){
-        return lhs *= rhs;
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::minus<T>>>
+    operator-(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::minus<T>>(lhs.data(), Scalar<T>{elem}, std::minus<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyLScalar<T, V, std::multiplies<T>>>
+    operator*(const T &elem, const Matrix<T, M, N, V> &rhs){
+        return binaryProxyLScalar<T, V, std::multiplies<T>>(Scalar<T>{elem}, rhs.data(), std::multiplies<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::multiplies<T>>>
+    operator*(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::multiplies<T>>(lhs.data(), Scalar<T>{elem}, std::multiplies<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::divides<T>>>
+    operator/(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::divides<T>>(lhs.data(), Scalar<T>{elem}, std::divides<T>());
     }    
 
-}   // Lee
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::modulus<T>>>
+    operator%(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::modulus<T>>(lhs.data(), Scalar<T>{elem}, std::modulus<T>());
+    }       
 
-#endif  // MATRIX_H
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::equal_to<T>>>
+    operator==(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::equal_to<T>>(lhs.data(), rhs.data(), std::equal_to<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::not_equal_to<T>>>
+    operator!=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::not_equal_to<T>>(lhs.data(), rhs.data(), std::not_equal_to<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater<T>>>
+    operator>(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::greater<T>>(lhs.data(), rhs.data(), std::greater<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater_equal<T>>>
+    operator>=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::greater_equal<T>>(lhs.data(), rhs.data(), std::greater_equal<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less<T>>>
+    operator<(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::less<T>>(lhs.data(), rhs.data(), std::less<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less_equal<T>>>
+    operator<=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::less_equal<T>>(lhs.data(), rhs.data(), std::less_equal<T>());
+    }
+
+    template<typename T, size_t M, typename V>
+    class transProxy{
+    public:
+        using value_type     = T;
+        using iterator       = Iterator<T, transProxy>;
+        using const_iterator = ConstIterator<T, transProxy>;
+
+        transProxy(const V &v) : vec{v} {}
+
+        size_t size() const {
+            return vec.size();
+        }
+
+        T operator()(size_t i, size_t j){
+            return vec[j*M+i];
+        }
+
+        T operator()(size_t i, size_t j) const{
+            return vec[j*M+i];
+        }
+
+        iterator begin(){
+            return iterator(*this, 0);
+        }
+
+        const_iterator begin() const{
+            return const_iterator(*this, 0);
+        }
+
+        iterator end(){
+            return iterator(*this, size());
+        }
+
+        const_iterator end() const{
+            return const_iterator(*this, size());
+        }
+
+    private:
+        const V &vec;
+    };
+
+    // unary operations
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, N, M, transProxy<T, N, V>> 
+    transpose(const Matrix<T, M, N, V> &m){
+        return transProxy<T, N, V>(m.data());
+    }
+
+
+}   // Lee

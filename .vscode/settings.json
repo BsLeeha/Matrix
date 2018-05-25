@@ -59,7 +59,8 @@
         "xhash": "cpp",
         "xlocmon": "cpp",
         "xloctime": "cpp",
-        "numeric": "cpp"
+        "numeric": "cpp",
+        "xcomplex": "c"
     },
     "cSpell.words": [
         "cbegin",

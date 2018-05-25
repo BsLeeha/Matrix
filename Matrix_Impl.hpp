@@ -1,9 +1,17 @@
-#ifndef _MATRiX_IMPL_H
-#define _MATRiX_IMPL_H
+#pragma once
 
 #include <type_traits>
 #include <algorithm>
 #include <functional>
+
+namespace Lee{
+    template<typename T, size_t M, size_t N, typename V>
+    class Matrix;    
+
+    template<typename T, size_t M, typename V>
+    class transProxy;    
+
+}
 
 namespace MatrixImpl{
 
@@ -23,63 +31,49 @@ namespace MatrixImpl{
     template<typename T, size_t N>
     using NestedInitializerListN = typename NestedInitializerList<T, N>::type;
 
+    template<typename T>
+    struct IsMatrixType{
+        static const bool value = false;
+    };
+
+    template<typename T, size_t M, size_t N, typename V>
+    struct IsMatrixType<Lee::Matrix<T, M, N, V>>{
+        static const bool value = true;
+    }; 
+
+    template<typename T>
+    struct IsTransType{
+        static const bool value = false;
+    };
+
+    template<typename T, size_t M, typename V>
+    struct IsTransType<Lee::transProxy<T, M, V>>{
+        static const bool value = true;
+    };
+
+    template<typename M>
+    void index_bounds_check(const M &m, size_t r, size_t c){
+        if(IsMatrixType<M>::value) assert(r<m.rows() && c<m.cols() && "index out of range");
+    }    
+
+    template<typename M>
+    void matrix_valid(const M &m){
+        assert(m.data().size() == m.rows()*m.cols() && "matrix is not valid");
+    }
+
+    template<typename M, typename...Dims>
+    void matrix_valid(const M &m, const Dims &...dims){
+        assert(m.data().size() == m.rows()*m.cols() && "matrix is not valid");
+        matrix_valid(dims...);
+    }
+
+
     constexpr bool Request_index() { return true; }
 
     template<typename T, typename...Args>
     constexpr bool Request_index(T first, Args...args){
         return std::is_convertible<T, size_t>::value && Request_index(args...);
     }
-
-    size_t product(size_t a){
-        return a;
-    }
-
-    template<typename...Ts>
-    size_t product(size_t a, Ts...ts){
-        assert(Request_index(ts...) && "index type wrong"); 
-
-        return a * product(ts...);
-    }
-
-    template<size_t N, typename List>
-    void derive_extents(const List &list, size_t *p, typename std::enable_if<(N==1), void>::type* = 0){
-        *p = list.size();
-    }
-
-    template<size_t N, typename List>
-    void derive_extents(const List &list, size_t *p, typename std::enable_if<(N>1), void>::type* =0){
-        *p = list.size();
-        derive_extents<N-1>(*list.begin(), ++p);
-    }    
-
-    // template<typename T, size_t N, typename List>
-    // void derive_elems(const List &list, T *p, typename std::enable_if<(N==1), void>::type* = 0){
-    //     for(auto i : list){
-    //         *p++ = i;
-    //     }
-    // }
-
-    // template<typename T, size_t N, typename List>
-    // void derive_elems(const List &list, T *p, typename std::enable_if<(N>1), void>::type* = 0){
-    //     for(auto i = list.begin(); i != list.end(); ++i){
-    //         derive_elems<T, N-1>(*i, p);
-    //         if(i != list.end()-1) p += i->size();
-    //     }
-    // }
-
-    template<typename T, size_t N, typename List, typename Vec>
-    void derive_elems(const List &list, Vec &v, typename std::enable_if<(N==1), void>::type* = 0){
-        for(auto i : list){
-            v.push_back(i);
-        }
-    }
-
-    template<typename T, size_t N, typename List, typename Vec>
-    void derive_elems(const List &list, Vec &v, typename std::enable_if<(N>1), void>::type* = 0){
-        for(auto i = list.begin(); i != list.end(); ++i){
-            derive_elems<T, N-1>(*i, v);
-        }
-    }    
 
     template<typename T, typename...Dims>
     bool check_bounds(T slice, Dims...dims){
@@ -90,11 +84,5 @@ namespace MatrixImpl{
         return true;
     }
 
-    template<typename M>
-    void assert_size_equal(const M &lhs, const M &rhs) {
-            assert((lhs.description() == rhs.description()) && "size not match");        
-    }
-
 }   //Matrix_Impl
 
-#endif // _MATRiX_IMPL_H

@@ -7,9 +7,8 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
-#include "Matrix_Test.cpp"
-#include "Matrix_Desc_Test.cpp"
-#include "Matrix_ref_test.cpp"
+#include "Matrix.hpp"
+#include "Matrix_Impl.hpp"
 
 using namespace std;
 
@@ -17,9 +16,11 @@ int main(){
 try{
     auto t0 = chrono::high_resolution_clock::now();
 
-    Matrix_Desc_Test();
-    Matrix_Test();
-    Matrix_ref_test();
+    Lee::Matrix<int, 3, 2> m(6, 1);
+    Lee::Matrix<int, 3, 2> m1{1, 2, 3, 4};
+    Lee::Matrix<int, 3, 2> m2{1, 2, 3, 4};
+    Lee::Matrix<int, 3, 2> m3 = 2*(1+2+m-1+2+3)*2/16%2;
+    std::cout << m1+1 << transpose(m1+1);
 
     auto t1 = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(t1-t0).count();
