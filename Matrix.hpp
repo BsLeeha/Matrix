@@ -46,33 +46,10 @@ namespace MatrixImpl{
     void matrix_valid(const M &m, const Dims &...dims);      
 
     template<typename T>
-    struct IsTransType;          
+    struct IsParenType;          
 }
 
 namespace Lee{
-
-    template<typename T, size_t M, size_t N, typename V>
-    class Matrix;
-    
-    using RealScalar = Matrix<double, 1, 1, std::vector<double>>;
-    
-    template<typename T, size_t N>
-    using Vectorr = Matrix<T, 1, N, std::vector<T>>;
-    
-    template<typename T, size_t M>
-    using Vectorc = Matrix<T, M, 1, std::vector<T>>;
-
-    template<size_t N>
-    using RealVectorr = Matrix<double, 1, N, std::vector<double>>;
-    
-    template<size_t M>
-    using RealVectorc = Matrix<double, M, 1, std::vector<double>>;
-
-    template<typename T, size_t N>
-    using EyeMatrix = Matrix<T, N, N, std::vector<T>>;    
-
-    template<size_t N>
-    using RealEyeMatrix = Matrix<double, N, N, std::vector<double>>;
 
     template<typename T, size_t N>
     using NestedInitializerListN = typename MatrixImpl::NestedInitializerList<T, N>::type;
@@ -82,6 +59,21 @@ namespace Lee{
 
     template<typename T, typename V1, typename V2, typename F>
     class binaryProxy;    
+
+    struct slice{
+        explicit slice(size_t nstart, size_t nend, size_t nstride) 
+            : start{nstart*nstride}, size{nend-nstart+1}, stride{nstride} {}
+
+        size_t operator()(size_t i) const{
+            return start+i*stride;
+        }
+
+        size_t start;
+        size_t size;
+        size_t stride;
+    };
+    template<typename T, size_t M, size_t N>
+    class sliceMatrix;
 
     template<typename T, size_t M, size_t N, typename V = std::vector<T>>
     class Matrix{
@@ -131,6 +123,7 @@ namespace Lee{
             assert(elems.size() == M*N && "construction fail");                
         }        
 
+        // for several kinds of expression proxies
         Matrix(const V &vec) : elems{vec} {}
 
         template<typename V1>
@@ -141,6 +134,20 @@ namespace Lee{
             for(size_t i = 0; i < M; ++i)
                 for(size_t j = 0; j < N; ++j)
                     (*this)(i, j) = rhs(i, j); 
+
+            assert(elems.size() == M*N && "assignment fail");                                          
+        }
+
+        template<size_t M1, size_t N1>
+        Matrix(const sliceMatrix<T, M1, N1> &rhs){
+            assert(rhs.rows() == M && rhs.cols() == N && "assignment does not match");
+
+            elems.resize(size());
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = rhs(i, j);
+
+            assert(elems.size() == M*N && "assignment fail");                      
         }
 
         Matrix(Matrix &&rhs) = default;      
@@ -195,6 +202,20 @@ namespace Lee{
             for(size_t i = 0; i < M; ++i)
                 for(size_t j = 0; j < N; ++j)
                     (*this)(i, j) = rhs(i, j);
+                    
+            assert(elems.size() == M*N && "assignment fail");                      
+            return *this;
+        }
+
+        template<size_t M1, size_t N1>
+        Matrix& operator=(const sliceMatrix<T, M1, N1> &rhs){
+            assert(rhs.rows() == M && rhs.cols() == N && "assignment does not match");
+
+            for(size_t i = 0; i < M; ++i)
+                for(size_t j = 0; j < N; ++j)
+                    (*this)(i, j) = rhs(i, j);
+
+            assert(elems.size() == M*N && "assignment fail");                      
             return *this;
         }
 
@@ -212,7 +233,7 @@ namespace Lee{
         
         // element access
         template<typename Q = V>
-        typename std::enable_if<MatrixImpl::IsTransType<Q>::value, T&>::type
+        typename std::enable_if<MatrixImpl::IsParenType<Q>::value, T&>::type
         operator()(size_t i, size_t j){
             MatrixImpl::index_bounds_check(*this, i, j);   
             
@@ -220,7 +241,7 @@ namespace Lee{
         }
 
         template<typename Q = V>
-        typename std::enable_if<!MatrixImpl::IsTransType<Q>::value, T&>::type
+        typename std::enable_if<!MatrixImpl::IsParenType<Q>::value, T&>::type
         operator()(size_t i, size_t j) { 
             MatrixImpl::index_bounds_check(*this, i, j);   
 
@@ -228,7 +249,7 @@ namespace Lee{
         }    
 
         template<typename Q = V>
-        typename std::enable_if<MatrixImpl::IsTransType<Q>::value, T>::type
+        typename std::enable_if<MatrixImpl::IsParenType<Q>::value, T>::type
         operator()(size_t i, size_t j) const {
             MatrixImpl::index_bounds_check(*this, i, j);   
             
@@ -236,12 +257,14 @@ namespace Lee{
         }
 
         template<typename Q = V>
-        typename std::enable_if<!MatrixImpl::IsTransType<Q>::value, T>::type
+        typename std::enable_if<!MatrixImpl::IsParenType<Q>::value, T>::type
         operator()(size_t i, size_t j) const { 
             MatrixImpl::index_bounds_check(*this, i, j);
 
             return elems[i*N+j]; 
         }  
+
+        V& data() { return elems; }
 
         const V& data() const { return elems; }
 
@@ -254,7 +277,22 @@ namespace Lee{
         const_iterator end() const { return elems.end(); }
 
         // submatrix access
+        sliceMatrix<T, M, N> operator()(slice r, slice c){
+            return sliceMatrix<T, M, N>(*this, r, c);
+        }
         
+        sliceMatrix<T, M, N> row(size_t i){
+            MatrixImpl::index_bounds_check(*this, i, 0);
+
+            return sliceMatrix<T, M, N>(*this, slice(i, i, N), slice(0, N-1, 1));
+        }
+
+        sliceMatrix<T, M, N> col(size_t i){
+            MatrixImpl::index_bounds_check(*this, 0, i);
+
+            return sliceMatrix<T, M, N>(*this, slice(0, M-1, N), slice(i, i, 1));
+        }
+
         // unary operations
         Matrix<T, M, N, applyProxy<T, V, std::negate<T>>> operator-(){
             return apply(std::negate<T>());
@@ -270,7 +308,6 @@ namespace Lee{
         Matrix<T, M, N, binaryProxy<T, V, V1, std::minus<T>>> operator-(const Matrix<T, M, N, V1> &rhs){
             return binaryProxy<T, V, V1, std::minus<T>>(elems, rhs.data(), std::minus<T>());
         }
-
 
         // arithmetic operations
         Matrix& operator+=(const Matrix &m){
@@ -305,24 +342,6 @@ namespace Lee{
             
             return (*this) *= 1/r;
         }
-
-        // matrix multiplication
-        template<size_t M1, size_t N1>
-        Matrix<T, M, N1> operator*(const Matrix<T, M1, N1> &m){
-            MatrixImpl::matrix_valid(*this, m);       
-            
-            if(N != M1) throw std::runtime_error("matrix size mismatch for operator *");
-            Matrix<T, M, N1> res;
-            for(size_t i = 0; i < M; ++i)
-                for(size_t j = 0; j < N1; ++j)
-                    for(size_t k = 0; k < N; ++k)
-                        res(i, j) += (*this)(i, k)*m(k, j);
-            return res;
-        }
-
-        void permute(size_t r1, size_t r2);
-
-        bool is_invertible(){ return (M==N) && (rank(*this) == N); }
 
         void to_eye(){
             MatrixImpl::matrix_valid(*this);       
@@ -360,29 +379,6 @@ namespace Lee{
                     if(i!=j && (*this)(i, j)) { flag = 1; break; }
             return flag ? false : true;            
         }
-
-        // slice operations
-        Matrix<T, 1, N> row(size_t r){
-            MatrixImpl::index_bounds_check(*this, r);
-
-            Matrix<T, 1, N> res;
-            for(size_t i = 0; i < N; ++i)
-                res(0, i) = (*this)(r, i);
-            return res;
-        }
-
-        Matrix<T, M, 1> col(size_t c){
-            MatrixImpl::index_bounds_check(*this, c);
-
-            Matrix<T, M, 1> res;
-            for(size_t i = 0; i < M; ++i)
-                res(i, 0) = (*this)(i, c);
-            return res;            
-        }
-
-        void setcol(size_t c, const Matrix<T, M, 1> &);
-
-        // concatenate operations
 
     private:
         V elems;
@@ -698,7 +694,7 @@ namespace Lee{
         const F   &func;
     };
 
-    // unary operations
+    /* unary operations */
     template<typename T, size_t M, size_t N, typename V>
     Matrix<T, M, N, binaryProxyRScalar<T, V, std::plus<T>>> 
     operator+(const Matrix<T, M, N, V> &lhs, const T &elem){
@@ -777,6 +773,67 @@ namespace Lee{
         return binaryProxy<bool, V1, V2, std::less_equal<T>>(lhs.data(), rhs.data(), std::less_equal<T>());
     }
 
+    template<typename T, size_t M, size_t N, size_t N1, typename V1, typename V2>
+    class matrixMultiProxy{
+    public:
+        using value_type     = T;
+        using iterator       = Iterator<T, matrixMultiProxy>;
+        using const_iterator = ConstIterator<T, matrixMultiProxy>;
+
+        matrixMultiProxy(const V1 &left, const V2 &right) 
+            : lhs{left}, rhs{right} {}
+
+        size_t size() const { return M*N1; }
+
+        template<typename Q = V1>
+        typename std::enable_if<MatrixImpl::IsParenType<Q>::value, T>::type
+        operator()(size_t r, size_t c) const{
+            T res = static_cast<T>(0);
+
+            for(size_t i = 0; i < N; ++i)
+                res += lhs(r, i)*rhs[i*N1+c];
+            
+            return res;
+        }
+
+        template<typename Q = V1>
+        typename std::enable_if<!MatrixImpl::IsParenType<Q>::value, T>::type
+        operator()(size_t r, size_t c) const{
+            T res = static_cast<T>(0);
+
+            for(size_t i = 0; i < N; ++i)
+                res += lhs[r*N+i]*rhs[i*N1+c];
+            
+            return res;
+        }        
+
+        iterator begin(){
+            return iterator(*this, 0);
+        }
+
+        const_iterator begin() const{
+            return const_iterator(*this, 0);
+        }
+
+        iterator end(){
+            return iterator(*this, size());
+        }
+
+        const_iterator end() const{
+            return const_iterator(*this, size());
+        }
+
+    private:
+        const V1 &lhs;
+        const V2 &rhs;
+    };
+
+    template<typename T, size_t M1, size_t N, size_t N1, typename V1, typename V2>
+    Matrix<T, M1, N1, matrixMultiProxy<T, M1, N, N1, V1, V2>>
+    operator*(const Matrix<T, M1, N, V1> &lhs, const Matrix<T, N, N1, V2> &rhs){
+        return matrixMultiProxy<T, M1, N, N1, V1, V2>(lhs.data(), rhs.data());
+    }
+
     template<typename T, size_t M, typename V>
     class transProxy{
     public:
@@ -824,6 +881,85 @@ namespace Lee{
     transpose(const Matrix<T, M, N, V> &m){
         return transProxy<T, N, V>(m.data());
     }
+    
+    template<typename T, size_t M, size_t N>
+    class sliceMatrix{
+    public:
+        using iterator       = typename Matrix<T, M, N>::iterator;
+        using const_iterator = typename Matrix<T, M, N>::const_iterator;
 
+        sliceMatrix(Matrix<T, M, N> &m, slice row, slice col) 
+            : mat{m}, r{row}, c{col} {}
+
+        size_t rows() const { return r.size; }
+
+        size_t cols() const { return c.size; }
+
+        size_t size() const { return r.size*c.size; }
+
+        T& operator()(size_t i, size_t j){
+            MatrixImpl::index_bounds_check(*this, i, j);
+            return mat.data()[r(i)+c.start+j*c.stride];            
+        }
+
+        const T& operator()(size_t i, size_t j) const{
+            MatrixImpl::index_bounds_check(*this, i, j);
+            return mat.data()[r(i)+c.start+j*c.stride];
+        }
+
+        sliceMatrix& operator=(std::initializer_list<T> il){
+            assert(il.size() == size() && "overinput");
+
+            std::vector<T> vec{il};
+            for(size_t i = 0; i < rows(); ++i)
+                for(size_t j = 0; j < cols(); ++j)
+                    (*this)(i, j) = vec[i*cols()+j];
+
+            return *this;
+        }
+
+        sliceMatrix& operator=(const sliceMatrix &rhs){
+            for(size_t i = 0; i < rows(); ++i)
+                for(size_t j = 0; j < cols(); ++j)
+                    (*this)(i, j) = rhs(i, j);
+
+            return *this;
+        }
+
+        iterator begin(){
+            return mat.begin();
+        }
+        
+        const_iterator begin() const{
+            return mat.begin();
+        }
+
+        iterator end(){
+            return mat.end();
+        }
+
+        const_iterator end() const{
+            return mat.end();
+        }
+
+    private:
+        Matrix<T, M, N> &mat;   
+        slice r;
+        slice c;
+    };
+
+    template<typename T, size_t M, size_t N>
+    std::ostream& operator<<(std::ostream &os, const sliceMatrix<T, M, N> &sm){
+        for(size_t i = 0; i < sm.rows(); ++i){
+            for(size_t j = 0; j < sm.cols(); ++j){
+                os.width(8);
+                os.precision(3);
+                os << std::fixed << sm(i, j) << " ";
+            }
+            os << '\n';
+        }            
+        os << '\n';
+        return os;
+    }
 
 }   // Lee

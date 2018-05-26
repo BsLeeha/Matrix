@@ -11,6 +11,9 @@ namespace Lee{
     template<typename T, size_t M, typename V>
     class transProxy;    
 
+    template<typename T, size_t M, size_t N, size_t N1, typename V1, typename V2>
+    class matrixMultiProxy;    
+
 }
 
 namespace MatrixImpl{
@@ -42,14 +45,21 @@ namespace MatrixImpl{
     }; 
 
     template<typename T>
-    struct IsTransType{
+    struct IsParenType{
         static const bool value = false;
     };
 
     template<typename T, size_t M, typename V>
-    struct IsTransType<Lee::transProxy<T, M, V>>{
+    struct IsParenType<Lee::transProxy<T, M, V>>{
         static const bool value = true;
     };
+
+    template<typename T, size_t M, size_t N, size_t N1, typename V1, typename V2>
+    struct IsParenType<Lee::matrixMultiProxy<T, M, N, N1, V1, V2>>{
+        static const bool value = true;
+    };
+
+
 
     template<typename M>
     void index_bounds_check(const M &m, size_t r, size_t c){
