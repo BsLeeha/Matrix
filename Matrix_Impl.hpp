@@ -59,8 +59,6 @@ namespace MatrixImpl{
         static const bool value = true;
     };
 
-
-
     template<typename M>
     void index_bounds_check(const M &m, size_t r, size_t c){
         if(IsMatrixType<M>::value) assert(r<m.rows() && c<m.cols() && "index out of range");
@@ -77,6 +75,12 @@ namespace MatrixImpl{
         matrix_valid(dims...);
     }
 
+    template<typename T>
+    struct abs{
+        abs() = default;
+
+        constexpr T operator()(const T &elem) const { return ((elem >= 0) ? elem : -elem); }
+    };
 
     constexpr bool Request_index() { return true; }
 

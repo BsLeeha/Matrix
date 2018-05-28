@@ -47,6 +47,9 @@ namespace MatrixImpl{
 
     template<typename T>
     struct IsParenType;          
+
+    template<typename T>
+    struct abs;    
 }
 
 namespace Lee{
@@ -385,6 +388,7 @@ namespace Lee{
 
     };
 
+    // matrix format ouput
     template<typename T, size_t M, size_t N, typename V>
     std::ostream& operator<<(std::ostream &os, const Matrix<T, M, N, V> &m){
         MatrixImpl::matrix_valid(m);       
@@ -401,6 +405,7 @@ namespace Lee{
         return os;
     }
 
+    // matrix input
     template<typename T, size_t M, size_t N>
     std::istream& operator>>(std::istream &is, Matrix<T, M, N> &m){
         char c;
@@ -416,34 +421,6 @@ namespace Lee{
         }
         else std::cout << "\nshould start with '['\n";
         return is;
-    }
-
-    // concatenate 
-    // vertcat
-    template<typename T, size_t M1, size_t M2, size_t N>
-    Matrix<T, M1+M2, N> vertcat(const Matrix<T, M1, N> &m1, const Matrix<T, M2, N> &m2){
-        MatrixImpl::matrix_valid(m1, m2);
-
-        Matrix<T, M1+M2, N> res;
-        for(size_t i = 0; i < M1+M2; ++i)
-            for(size_t j = 0; j < N; ++j)
-                if(i < M1) res(i, j) = m1(i, j);
-                else res(i, j) = m2(i-M1, j);
-
-        return res;
-    }
-
-    template<typename T, size_t M, size_t N1, size_t N2>
-    Matrix<T, M, N1+N2> horzcat(const Matrix<T, M, N1> &m1, const Matrix<T, M, N2> &m2){
-        MatrixImpl::matrix_valid(m1, m2);
-
-        Matrix<T, M, N1+N2> res;
-        for(size_t i = 0; i < M; ++i)
-            for(size_t j = 0; j < N1+N2; ++j)
-                if(j < N1) res(i, j) = m1(i, j);
-                else res(i, j) = m2(i, j-N1);
-
-        return res;
     }
 
     template<typename T, typename P>
@@ -486,7 +463,6 @@ namespace Lee{
         }
 
     };
-
 
     template<typename T, typename P>
     struct ConstIterator{
@@ -549,7 +525,7 @@ namespace Lee{
         using iterator       = Iterator<T, applyProxy>;
         using const_iterator = ConstIterator<T, applyProxy>;
 
-        applyProxy(const V &left, F &function) : lhs{left}, func{function} {}
+        applyProxy(const V &left, const F &function) : lhs{left}, func{function} {}
 
         T operator[](size_t i) const{
             return func(lhs[i]);
@@ -579,6 +555,63 @@ namespace Lee{
         const V &lhs;
         const F &func;
     };
+
+    template<typename T, size_t M, typename V>
+    class transProxy{
+    public:
+        using value_type     = T;
+        using iterator       = Iterator<T, transProxy>;
+        using const_iterator = ConstIterator<T, transProxy>;
+
+        transProxy(const V &v) : vec{v} {}
+
+        size_t size() const {
+            return vec.size();
+        }
+
+        T operator()(size_t i, size_t j){
+            return vec[j*M+i];
+        }
+
+        T operator()(size_t i, size_t j) const{
+            return vec[j*M+i];
+        }
+
+        iterator begin(){
+            return iterator(*this, 0);
+        }
+
+        const_iterator begin() const{
+            return const_iterator(*this, 0);
+        }
+
+        iterator end(){
+            return iterator(*this, size());
+        }
+
+        const_iterator end() const{
+            return const_iterator(*this, size());
+        }
+
+    private:
+        const V &vec;
+    };
+
+    /* unary operations */
+    // negate: member function
+    // abs 
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, applyProxy<T, V, MatrixImpl::abs<T>>>
+    abs(const Matrix<T, M, N, V> &m){
+        return applyProxy<T, V, MatrixImpl::abs<T>>(m.data(), MatrixImpl::abs<T>());
+    }
+
+    // tranpose
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, N, M, transProxy<T, N, V>> 
+    transpose(const Matrix<T, M, N, V> &m){
+        return transProxy<T, N, V>(m.data());
+    }
 
     template<typename T, typename V1, typename V2, typename F>
     class binaryProxy{
@@ -694,85 +727,6 @@ namespace Lee{
         const F   &func;
     };
 
-    /* unary operations */
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyRScalar<T, V, std::plus<T>>> 
-    operator+(const Matrix<T, M, N, V> &lhs, const T &elem){
-        return binaryProxyRScalar<T, V, std::plus<T>>(lhs.data(), Scalar<T>{elem}, std::plus<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyLScalar<T, V, std::plus<T>>>
-    operator+(const T &elem, const Matrix<T, M, N, V> &rhs){
-        return binaryProxyLScalar<T, V, std::plus<T>>(Scalar<T>{elem}, rhs.data(), std::plus<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyRScalar<T, V, std::minus<T>>>
-    operator-(const Matrix<T, M, N, V> &lhs, const T &elem){
-        return binaryProxyRScalar<T, V, std::minus<T>>(lhs.data(), Scalar<T>{elem}, std::minus<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyLScalar<T, V, std::multiplies<T>>>
-    operator*(const T &elem, const Matrix<T, M, N, V> &rhs){
-        return binaryProxyLScalar<T, V, std::multiplies<T>>(Scalar<T>{elem}, rhs.data(), std::multiplies<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyRScalar<T, V, std::multiplies<T>>>
-    operator*(const Matrix<T, M, N, V> &lhs, const T &elem){
-        return binaryProxyRScalar<T, V, std::multiplies<T>>(lhs.data(), Scalar<T>{elem}, std::multiplies<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyRScalar<T, V, std::divides<T>>>
-    operator/(const Matrix<T, M, N, V> &lhs, const T &elem){
-        return binaryProxyRScalar<T, V, std::divides<T>>(lhs.data(), Scalar<T>{elem}, std::divides<T>());
-    }    
-
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, M, N, binaryProxyRScalar<T, V, std::modulus<T>>>
-    operator%(const Matrix<T, M, N, V> &lhs, const T &elem){
-        return binaryProxyRScalar<T, V, std::modulus<T>>(lhs.data(), Scalar<T>{elem}, std::modulus<T>());
-    }       
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::equal_to<T>>>
-    operator==(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::equal_to<T>>(lhs.data(), rhs.data(), std::equal_to<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::not_equal_to<T>>>
-    operator!=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::not_equal_to<T>>(lhs.data(), rhs.data(), std::not_equal_to<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater<T>>>
-    operator>(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::greater<T>>(lhs.data(), rhs.data(), std::greater<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater_equal<T>>>
-    operator>=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::greater_equal<T>>(lhs.data(), rhs.data(), std::greater_equal<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less<T>>>
-    operator<(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::less<T>>(lhs.data(), rhs.data(), std::less<T>());
-    }
-
-    template<typename T, size_t M, size_t N, typename V1, typename V2>
-    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less_equal<T>>>
-    operator<=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
-        return binaryProxy<bool, V1, V2, std::less_equal<T>>(lhs.data(), rhs.data(), std::less_equal<T>());
-    }
-
     template<typename T, size_t M, size_t N, size_t N1, typename V1, typename V2>
     class matrixMultiProxy{
     public:
@@ -828,58 +782,99 @@ namespace Lee{
         const V2 &rhs;
     };
 
+    /* binary operations */
+    // arithmetric add: matrix + scalar
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::plus<T>>> 
+    operator+(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::plus<T>>(lhs.data(), Scalar<T>{elem}, std::plus<T>());
+    }
+
+    // arithmetric add: scalar + matrix
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyLScalar<T, V, std::plus<T>>>
+    operator+(const T &elem, const Matrix<T, M, N, V> &rhs){
+        return binaryProxyLScalar<T, V, std::plus<T>>(Scalar<T>{elem}, rhs.data(), std::plus<T>());
+    }
+
+    // arithmetric subtract: matrix - scalar
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::minus<T>>>
+    operator-(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::minus<T>>(lhs.data(), Scalar<T>{elem}, std::minus<T>());
+    }
+
+    // arithmetric multiply: scalar * matrix
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyLScalar<T, V, std::multiplies<T>>>
+    operator*(const T &elem, const Matrix<T, M, N, V> &rhs){
+        return binaryProxyLScalar<T, V, std::multiplies<T>>(Scalar<T>{elem}, rhs.data(), std::multiplies<T>());
+    }
+
+    // arithmetric multiply: matrix * scalar
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::multiplies<T>>>
+    operator*(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::multiplies<T>>(lhs.data(), Scalar<T>{elem}, std::multiplies<T>());
+    }
+
+    // arithmetric divide: matrix / scalar
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::divides<T>>>
+    operator/(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::divides<T>>(lhs.data(), Scalar<T>{elem}, std::divides<T>());
+    }    
+
+    // arithmetric module: matrix % scalar
+    template<typename T, size_t M, size_t N, typename V>
+    Matrix<T, M, N, binaryProxyRScalar<T, V, std::modulus<T>>>
+    operator%(const Matrix<T, M, N, V> &lhs, const T &elem){
+        return binaryProxyRScalar<T, V, std::modulus<T>>(lhs.data(), Scalar<T>{elem}, std::modulus<T>());
+    }       
+
+    // equal judge: matrix == matrix
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::equal_to<T>>>
+    operator==(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::equal_to<T>>(lhs.data(), rhs.data(), std::equal_to<T>());
+    }
+
+    // not equal judge: matrix != matrix
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::not_equal_to<T>>>
+    operator!=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::not_equal_to<T>>(lhs.data(), rhs.data(), std::not_equal_to<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater<T>>>
+    operator>(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::greater<T>>(lhs.data(), rhs.data(), std::greater<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::greater_equal<T>>>
+    operator>=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::greater_equal<T>>(lhs.data(), rhs.data(), std::greater_equal<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less<T>>>
+    operator<(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::less<T>>(lhs.data(), rhs.data(), std::less<T>());
+    }
+
+    template<typename T, size_t M, size_t N, typename V1, typename V2>
+    Matrix<bool, M, N, binaryProxy<bool, V1, V2, std::less_equal<T>>>
+    operator<=(const Matrix<T, M, N, V1> &lhs, const Matrix<T, M, N, V2> &rhs){
+        return binaryProxy<bool, V1, V2, std::less_equal<T>>(lhs.data(), rhs.data(), std::less_equal<T>());
+    }
+
+    // matrix multiplication 
     template<typename T, size_t M1, size_t N, size_t N1, typename V1, typename V2>
     Matrix<T, M1, N1, matrixMultiProxy<T, M1, N, N1, V1, V2>>
     operator*(const Matrix<T, M1, N, V1> &lhs, const Matrix<T, N, N1, V2> &rhs){
         return matrixMultiProxy<T, M1, N, N1, V1, V2>(lhs.data(), rhs.data());
-    }
-
-    template<typename T, size_t M, typename V>
-    class transProxy{
-    public:
-        using value_type     = T;
-        using iterator       = Iterator<T, transProxy>;
-        using const_iterator = ConstIterator<T, transProxy>;
-
-        transProxy(const V &v) : vec{v} {}
-
-        size_t size() const {
-            return vec.size();
-        }
-
-        T operator()(size_t i, size_t j){
-            return vec[j*M+i];
-        }
-
-        T operator()(size_t i, size_t j) const{
-            return vec[j*M+i];
-        }
-
-        iterator begin(){
-            return iterator(*this, 0);
-        }
-
-        const_iterator begin() const{
-            return const_iterator(*this, 0);
-        }
-
-        iterator end(){
-            return iterator(*this, size());
-        }
-
-        const_iterator end() const{
-            return const_iterator(*this, size());
-        }
-
-    private:
-        const V &vec;
-    };
-
-    // unary operations
-    template<typename T, size_t M, size_t N, typename V>
-    Matrix<T, N, M, transProxy<T, N, V>> 
-    transpose(const Matrix<T, M, N, V> &m){
-        return transProxy<T, N, V>(m.data());
     }
     
     template<typename T, size_t M, size_t N>

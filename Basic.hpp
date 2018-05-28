@@ -26,50 +26,6 @@ namespace Lee{
         return tmp;
     }    
 
-    template<typename T, int M, int N, int M1, int M2>
-    Matrix<T, M, N> row_cat(const Matrix<T, M1, N> &m1, const Matrix<T, M2, N> &m2){
-        Matrix<T, M, N> m;
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j){
-                if(i < M1) m(i, j) = m1(i, j);
-                else m(i, j) = m2(i-M1, j);
-            }
-        return m;
-    }
-
-    template<typename T, int M, int N, int N1, int N2>
-    Matrix<T, M, N> col_cat(const Matrix<T, M, N1> &m1, const Matrix<T, M, N2> &m2){
-        Matrix<T, M, N> m;
-        for(int i = 0; i < M; ++i)
-            for(int j = 0; j < N; ++j){
-                if(j < N1) m(i, j) = m1(i, j);
-                else m(i, j) = m2(i, j-N1);
-            }
-        return m;
-    }
-
-    template<typename T, int M, int N, int M1>
-    Matrix<T, M, N> row_split(const Matrix<T, M1, N> &m, int ri, int rj){
-        if(ri>=M1 || rj >= M1) throw std::out_of_range("Matrix index:");
-
-        Matrix<T, M, N> res;
-        for(int i = ri; i <= rj; ++i)
-            for(int j = 0; j < N; ++j)
-                res(i-ri, j) = m(i, j);
-        return res;
-    }
-
-    template<typename T, int M, int N, int N1>
-    Matrix<T, M, N> col_split(const Matrix<T, M, N1> &m, int ci, int cj){
-        if(ci>=N1 || cj >= N1) throw std::out_of_range("Matrix index:");
-
-        Matrix<T, M, N> res;
-        for(int i = 0; i < M; ++i)
-            for(int j = ci; j <= cj; ++j)
-                res(i, j-ci) = m(i, j);
-        return res;
-    }
-
     template<typename T, int M, int N>
     T max(const Matrix<T, M, N> &m){
         return *std::max_element(m.cbegin(), m.cend());
@@ -103,22 +59,6 @@ namespace Lee{
     template<typename T, int M, int N>
     int rank(const Matrix<T, M, N> &m){
         return pivot(m).size();
-    }
-
-    template<typename T, int M, int N>
-    Matrix<T, N, M> transpose(const Matrix<T, M, N> &m){
-        Matrix<T, N, M> res;
-        for(int i = 0; i != N; ++i)
-            for(int j = 0; j != M; ++j)
-                res(i, j) = m(j, i);
-        return res;
-    }    
-
-    template<typename T, int M1, int N1, int M2, int N2>
-    bool is_commute(Matrix<T, M1, N1> &m1, Matrix<T, M2, N2> &m2){
-        if(M1 != N2 || M2 != N1) return false;
-        if(m1*m2==m2*m1) return true;
-        else return false;
     }
 
     template<typename T, int M, int N>
