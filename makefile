@@ -1,10 +1,10 @@
 # compiler
-CC = g++
+CC = g++-7
 
 # compiler flags
 # -g adds debug information to the executable file
 # -Wall turns on most, but not all, compiler warnings 
-CFLAGS = -g -Wall -fexceptions -std=c++11
+CFLAGS = -g -std=c++11
 
 # target entry: "default" or "all"
 default : entry
@@ -22,7 +22,7 @@ main.o: main.cpp
 # .o: object file
 # .~: backup file
 clean: 
-	del *.exe *.o *.~
+	rm *.exe *.o *.~
 
 
 
